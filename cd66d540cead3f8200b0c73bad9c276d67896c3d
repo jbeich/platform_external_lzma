@@ -1,0 +1,7 @@
+Code-Review+2: Elliott Hughes <enh@google.com>
+Verified+1: David Srbecky <dsrbecky@google.com>
+Submitted-by: Bill Yi <byi@google.com>
+Submitted-at: Tue, 19 May 2015 16:16:42 +0000
+Reviewed-on: https://android-review.googlesource.com/150260
+Project: platform/external/lzma
+Branch: refs/heads/master
