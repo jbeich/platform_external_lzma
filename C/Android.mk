@@ -42,6 +42,7 @@ lzma_files := \
   XzEnc.c \
   XzIn.c
 
+include $(CLEAR_VARS)
 LOCAL_MODULE := liblzma
 LOCAL_CFLAGS := -D_7ZIP_ST
 LOCAL_SRC_FILES := $(lzma_files)
@@ -55,3 +56,18 @@ LOCAL_CFLAGS := -D_7ZIP_ST
 LOCAL_SRC_FILES := $(lzma_files)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblzma
+LOCAL_CFLAGS := -D_7ZIP_ST
+LOCAL_SRC_FILES := $(lzma_files)
+LOCAL_MULTILIB := both
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
+include $(BUILD_HOST_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblzma
+LOCAL_CFLAGS := -D_7ZIP_ST
+LOCAL_SRC_FILES := $(lzma_files)
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
+include $(BUILD_SHARED_LIBRARY)
