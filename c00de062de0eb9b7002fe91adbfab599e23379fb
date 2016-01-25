@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b4afde8e_58e97d35",
+        "filename": "C/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 1019050
+      },
+      "writtenOn": "2016-01-25T21:13:52Z",
+      "side": 1,
+      "message": "You\u0027ve got this twice, removing this one and leaving the one down below is probably the best bet.",
+      "range": {
+        "startLine": 4,
+        "startChar": 0,
+        "endLine": 4,
+        "endChar": 21
+      },
+      "revId": "c00de062de0eb9b7002fe91adbfab599e23379fb",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
