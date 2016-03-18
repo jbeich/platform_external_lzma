@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dc0f1e77_d8f91994",
+        "filename": "C/Android.bp",
+        "patchSetId": 2
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 1074628
+      },
+      "writtenOn": "2016-03-18T23:20:10Z",
+      "side": 1,
+      "message": "this should be:\n\n  target {\n    windows: {\n      enabled: true,\n    },\n  },",
+      "revId": "5e74896f5b8ab3325be45ddeb4b0934791c57aff",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
