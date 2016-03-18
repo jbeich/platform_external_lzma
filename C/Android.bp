@@ -48,4 +48,8 @@ cc_library {
         "XzEnc.c",
         "XzIn.c",
     ],
+
+    windows: {
+        enabled: true,
+    },
 }
