@@ -54,4 +54,8 @@ cc_library {
             enabled: true,
         },
     },
+
+    sanitize: {
+        never: true,
+    },
 }
