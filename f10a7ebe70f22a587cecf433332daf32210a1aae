@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a142433_ee8aa3da",
+        "filename": "C/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 6,
+      "author": {
+        "id": 1074628
+      },
+      "writtenOn": "2016-07-08T22:33:54Z",
+      "side": 1,
+      "message": "You may want to move this to stl: \"none\" so that you aren\u0027t pulling in a DT_NEEDED on libstdc++",
+      "revId": "f10a7ebe70f22a587cecf433332daf32210a1aae",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
