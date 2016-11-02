@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "46cc62f9_a941f9a9",
+        "filename": "C/Bcj2Enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1077068
+      },
+      "writtenOn": "2016-11-02T01:23:26Z",
+      "side": 1,
+      "message": "Technically you would need to include these new files in the Android.bp.",
+      "revId": "0ef5733d34ad4dcfdf604771724a1cb8e8133333",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
