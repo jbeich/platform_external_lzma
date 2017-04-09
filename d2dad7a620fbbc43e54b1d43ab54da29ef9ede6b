@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "743a9c54_d3c9eecd",
+        "filename": "C/Lzma2Enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 1003224
+      },
+      "writtenOn": "2017-04-09T17:16:24Z",
+      "side": 1,
+      "message": "this seems useless because you already know t2 \u003e 1 if you get here.",
+      "range": {
+        "startLine": 241,
+        "startChar": 10,
+        "endLine": 241,
+        "endChar": 21
+      },
+      "revId": "d2dad7a620fbbc43e54b1d43ab54da29ef9ede6b",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
