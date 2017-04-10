@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2137d662_af1f0194",
+        "filename": "C/Android.bp",
+        "patchSetId": 3
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 1002751
+      },
+      "writtenOn": "2017-04-10T03:08:41Z",
+      "side": 1,
+      "message": "This includes windows.h, and won\u0027t compile for linux or android",
+      "revId": "9e99ac8f4057e434328b393dbeb1f41ce2760756",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "c405e471_83a564da",
+        "filename": "C/Android.bp",
+        "patchSetId": 3
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 1002751
+      },
+      "writtenOn": "2017-04-10T03:08:41Z",
+      "side": 1,
+      "message": "This doesn\u0027t do anything for linux or android",
+      "revId": "9e99ac8f4057e434328b393dbeb1f41ce2760756",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "e119c2a3_0e4ce3da",
+        "filename": "C/Android.bp",
+        "patchSetId": 3
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 1002751
+      },
+      "writtenOn": "2017-04-10T03:08:41Z",
+      "side": 1,
+      "message": "This depends on Threads.c and won\u0027t compile for linux or android",
+      "revId": "9e99ac8f4057e434328b393dbeb1f41ce2760756",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "09018f94_7638d05f",
+        "filename": "C/Android.bp",
+        "patchSetId": 3
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 1002751
+      },
+      "writtenOn": "2017-04-10T03:08:41Z",
+      "side": 1,
+      "message": "This depends on Threads.c and won\u0027t compile for linux or android",
+      "revId": "9e99ac8f4057e434328b393dbeb1f41ce2760756",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "236fc8e2_84f27eb1",
+        "filename": "C/Android.bp",
+        "patchSetId": 3
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 1002751
+      },
+      "writtenOn": "2017-04-10T03:08:41Z",
+      "side": 1,
+      "message": "This depends on process.h and won\u0027t compile for linux or android",
+      "revId": "9e99ac8f4057e434328b393dbeb1f41ce2760756",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
