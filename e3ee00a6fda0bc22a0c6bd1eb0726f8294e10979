@@ -22,6 +22,30 @@
       "revId": "e3ee00a6fda0bc22a0c6bd1eb0726f8294e10979",
       "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "c75b840e_bd47fcb5",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1074628
+      },
+      "writtenOn": "2017-05-12T23:31:14Z",
+      "side": 1,
+      "message": "It\u0027s a static library, so that doesn\u0027t do anything, nor does it need to.",
+      "parentUuid": "73f2d589_d614b049",
+      "range": {
+        "startLine": 9,
+        "startChar": 13,
+        "endLine": 9,
+        "endChar": 33
+      },
+      "revId": "e3ee00a6fda0bc22a0c6bd1eb0726f8294e10979",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
     }
   ]
 }
