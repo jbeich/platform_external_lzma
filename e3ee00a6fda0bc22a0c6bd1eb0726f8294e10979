@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "73f2d589_d614b049",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1077068
+      },
+      "writtenOn": "2017-05-12T23:30:15Z",
+      "side": 1,
+      "message": "You can leave it as libxz-host adding:\n\n  unique_host_soname: true,",
+      "range": {
+        "startLine": 9,
+        "startChar": 13,
+        "endLine": 9,
+        "endChar": 33
+      },
+      "revId": "e3ee00a6fda0bc22a0c6bd1eb0726f8294e10979",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889",
+      "unresolved": false
+    }
+  ]
+}
