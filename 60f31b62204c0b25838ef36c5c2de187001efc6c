@@ -1,0 +1,8 @@
+Presubmit-Verified+1: Treehugger Robot <treehugger-gerrit@google.com>
+Code-Review+2: Elliott Hughes <enh@google.com>
+Verified+1: Sen Jiang <senj@google.com>
+Submitted-by: Sen Jiang <senj@google.com>
+Submitted-at: Fri, 11 May 2018 18:58:55 +0000
+Reviewed-on: https://android-review.googlesource.com/677747
+Project: platform/external/lzma
+Branch: refs/heads/master
