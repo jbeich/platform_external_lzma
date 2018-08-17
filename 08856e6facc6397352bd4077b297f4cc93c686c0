@@ -1,0 +1,9 @@
+Code-Review+2: Dan Willemsen <dwillemsen@google.com>
+Verified+1: Philip P. Moltmann <moltmann@google.com>
+Presubmit-Verified+1: Treehugger Robot <treehugger-gerrit@google.com>
+Autosubmit+1: Philip P. Moltmann <moltmann@google.com>
+Submitted-by: Treehugger Robot <treehugger-gerrit@google.com>
+Submitted-at: Fri, 17 Aug 2018 22:31:42 +0000
+Reviewed-on: https://android-review.googlesource.com/725905
+Project: platform/external/lzma
+Branch: refs/heads/master
