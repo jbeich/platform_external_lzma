@@ -8,6 +8,7 @@ cc_library {
     vndk: {
         enabled: true,
         support_system_process: true,
+        must_use_vendor_variant: true,
     },
     sdk_version: "9",
     stl: "none",
