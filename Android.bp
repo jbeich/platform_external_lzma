@@ -1,3 +1,14 @@
+package {
+    default_applicable_licenses: ["external_lzma_license"],
+}
+
+license {
+    name: "external_lzma_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["legacy_unencumbered"],
+    license_text: ["NOTICE"],
+}
+
 subdirs = [
     "C",
 ]
