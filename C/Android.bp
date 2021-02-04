@@ -1,5 +1,12 @@
 // Copyright 2015 The Android Open Source Project
 
+package {
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // the below license kinds from "external_lzma_license":
+    //   legacy_unencumbered
+    default_applicable_licenses: ["external_lzma_license"],
+}
+
 cc_library {
     name: "liblzma",
     host_supported: true,
