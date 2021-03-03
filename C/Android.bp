@@ -97,4 +97,5 @@ cc_library {
         "com.android.art", // from libartbase
         "com.android.art.debug",
     ],
+    min_sdk_version: "S",
 }
