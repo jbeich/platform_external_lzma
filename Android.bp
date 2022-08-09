@@ -12,6 +12,7 @@ license {
     license_text: [
         "NOTICE",
     ],
+    bazel_module: { bp2build_available: true},
 }
 
 subdirs = [
