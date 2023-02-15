@@ -46,7 +46,7 @@ cc_library {
         "7zFile.c",
         "7zStream.c",
         "Aes.c",
-        "AesOpt.c",
+        //"AesOpt.c",
         "Alloc.c",
         "Bcj2.c",
         "Bra86.c",
@@ -74,6 +74,15 @@ cc_library {
         "XzEnc.c",
         "XzIn.c",
     ],
+
+    arch: {
+        arm: {
+            cflags: ["-mcrc"],
+        },
+        arm64: {
+            cflags: ["-mcrc"],
+        },
+    },
 
     target: {
         linux_bionic: {
