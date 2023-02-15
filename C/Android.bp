@@ -29,6 +29,7 @@ cc_library {
         "-Werror",
         "-Wno-empty-body",
         "-Wno-enum-conversion",
+        "-Wno-ignored-attributes",
         "-Wno-logical-op-parentheses",
         "-Wno-self-assign",
     ],
@@ -46,7 +47,7 @@ cc_library {
         "7zFile.c",
         "7zStream.c",
         "Aes.c",
-        "AesOpt.c",
+        //"AesOpt.c",
         "Alloc.c",
         "Bcj2.c",
         "Bra86.c",
@@ -75,6 +76,15 @@ cc_library {
         "XzIn.c",
     ],
 
+    arch: {
+        arm: {
+            cflags: ["-mcrc"],
+        },
+        arm64: {
+            cflags: ["-mcrc"],
+        },
+    },
+
     target: {
         linux_bionic: {
             enabled: true,
@@ -85,6 +95,7 @@ cc_library {
                 "Bcj2Enc.c",
                 "DllSecur.c",
                 "LzFindMt.c",
+                "LzFindOpt.c",
                 "Lzma2DecMt.c",
                 "MtCoder.c",
                 "MtDec.c",
