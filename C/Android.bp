@@ -16,10 +16,6 @@ cc_library {
     recovery_available: true,
     vendor_ramdisk_available: true,
     native_bridge_supported: true,
-    vndk: {
-        enabled: true,
-        support_system_process: true,
-    },
     sdk_version: "9",
     stl: "none",
 
