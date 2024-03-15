@@ -26,6 +26,30 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "2e8f1936_18c24c8a",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1413436
+      },
+      "writtenOn": "2024-03-15T01:55:36Z",
+      "side": 1,
+      "message": "Updated commit message. PTAL.",
+      "parentUuid": "525a58bd_fe5cdea4",
+      "range": {
+        "startLine": 10,
+        "startChar": 15,
+        "endLine": 11,
+        "endChar": 15
+      },
+      "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "f55ab812_fa10b77f",
         "filename": "C/Android.bp",
         "patchSetId": 1
@@ -37,6 +61,24 @@
       "writtenOn": "2024-03-11T17:38:43Z",
       "side": 1,
       "message": "...this probably needs a mention in the checkin comment? what exactly does this do?",
+      "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c9362597_0d612a59",
+        "filename": "C/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 1413436
+      },
+      "writtenOn": "2024-03-15T01:55:36Z",
+      "side": 1,
+      "message": "As mentioned from commit message, former VNDK-SPs should be marked as double-loadable, so it can be referenced from LLNDK libraries.",
+      "parentUuid": "f55ab812_fa10b77f",
       "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
       "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
     }
