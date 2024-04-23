@@ -1,19 +1,20 @@
+# This project was upgraded with external_updater.
+# Usage: tools/external_updater/updater.sh update external/lzma
+# For more info, check https://cs.android.com/android/platform/superproject/+/main:tools/external_updater/README.md
+
 name: "lzma"
 description: "LZMA is default and general compression method of 7z format."
 third_party {
-  url {
-    type: HOMEPAGE
-    value: "https://7-zip.org/"
-  }
-  url {
-    type: ARCHIVE
-    value: "https://7-zip.org/a/lzma1900.7z"
-  }
-  version: "19.00"
   license_type: UNENCUMBERED
   last_upgrade_date {
-    year: 2023
-    month: 2
-    day: 14
+    year: 2024
+    month: 4
+    day: 18
+  }
+  homepage: "https://7-zip.org/"
+  identifier {
+    type: "Archive"
+    value: "https://github.com/ip7z/7zip/archive/23.01.tar.gz"
+    version: "23.01"
   }
 }
