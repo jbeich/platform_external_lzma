@@ -24,7 +24,7 @@ cc_library {
     stl: "none",
 
     cflags: [
-        "-D_7ZIP_ST",
+        "-DZ7_ST",
         "-Wall",
         "-Werror",
         "-Wno-empty-body",
@@ -66,6 +66,7 @@ cc_library {
         "Ppmd7Dec.c",
         "Ppmd7Enc.c",
         "Sha256.c",
+        "Sha256Opt.c",
         "Sort.c",
         "Xz.c",
         "XzCrc64.c",
@@ -74,6 +75,15 @@ cc_library {
         "XzEnc.c",
         "XzIn.c",
     ],
+
+    arch: {
+        arm: {
+            cflags: ["-march=armv8-a+crypto"],
+        },
+        arm64: {
+            cflags: ["-march=armv8-a+crypto"],
+        },
+    },
 
     target: {
         linux_bionic: {
@@ -85,6 +95,7 @@ cc_library {
                 "Bcj2Enc.c",
                 "DllSecur.c",
                 "LzFindMt.c",
+                "LzFindOpt.c",
                 "Lzma2DecMt.c",
                 "MtCoder.c",
                 "MtDec.c",
@@ -97,6 +108,7 @@ cc_library {
         "//apex_available:platform",
         "com.android.art", // from libartbase
         "com.android.art.debug",
+        "com.android.runtime",
     ],
     min_sdk_version: "apex_inherit",
 }
