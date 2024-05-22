@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4a139a3e_becaa1dd",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1003224
+      },
+      "writtenOn": "2024-05-22T21:30:25Z",
+      "side": 1,
+      "message": "can you rebase this on top of the larger change https://android-review.git.corp.google.com/c/platform/external/lzma/+/3095933? otherwise lgtm in the weak \"not a regression\" sense...",
+      "revId": "8c1176503c0b22fc837626fdabee7dde515320a8",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
+    }
+  ]
+}
