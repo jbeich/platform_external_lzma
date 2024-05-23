@@ -48,6 +48,30 @@
       "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "d83eab37_a418c2de",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1413436
+      },
+      "writtenOn": "2024-05-23T00:47:21Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2e8f1936_18c24c8a",
+      "range": {
+        "startLine": 10,
+        "startChar": 15,
+        "endLine": 11,
+        "endChar": 15
+      },
+      "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "f55ab812_fa10b77f",
@@ -79,6 +103,24 @@
       "side": 1,
       "message": "As mentioned from commit message, former VNDK-SPs should be marked as double-loadable, so it can be referenced from LLNDK libraries.",
       "parentUuid": "f55ab812_fa10b77f",
+      "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
+      "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b2563fe0_93c9f564",
+        "filename": "C/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 1413436
+      },
+      "writtenOn": "2024-05-23T00:47:21Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c9362597_0d612a59",
       "revId": "2996cbdf04e171c83d8a0d11be37ce801ddb1d12",
       "serverId": "85c56323-6fa9-3386-8a01-6480fb634889"
     }
