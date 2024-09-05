@@ -1,13 +1,13 @@
 // OutBuffer.h
 
-#ifndef ZIP7_INC_OUT_BUFFER_H
-#define ZIP7_INC_OUT_BUFFER_H
+#ifndef __OUT_BUFFER_H
+#define __OUT_BUFFER_H
 
 #include "../IStream.h"
 #include "../../Common/MyCom.h"
 #include "../../Common/MyException.h"
 
-#ifndef Z7_NO_EXCEPTIONS
+#ifndef _NO_EXCEPTIONS
 struct COutBufferException: public CSystemException
 {
   COutBufferException(HRESULT errorCode): CSystemException(errorCode) {}
@@ -29,11 +29,11 @@ protected:
 
   HRESULT FlushPart() throw();
 public:
-  #ifdef Z7_NO_EXCEPTIONS
+  #ifdef _NO_EXCEPTIONS
   HRESULT ErrorCode;
   #endif
 
-  COutBuffer(): _buf(NULL), _pos(0), _stream(NULL), _buf2(NULL) {}
+  COutBuffer(): _buf(0), _pos(0), _stream(0), _buf2(0) {}
   ~COutBuffer() { Free(); }
   
   bool Create(UInt32 bufSize) throw();

@@ -84,7 +84,7 @@ bool CParser::ParseString(const UString &s, const CSwitchForm *switchForms, unsi
     if (IsString1PrefixedByString2_NoCase_Ascii((const wchar_t *)s + pos, key))
     {
       switchIndex = i;
-      maxLen = (int)switchLen;
+      maxLen = switchLen;
     }
   }
 
@@ -94,7 +94,7 @@ bool CParser::ParseString(const UString &s, const CSwitchForm *switchForms, unsi
     return false;
   }
 
-  pos += (unsigned)maxLen;
+  pos += maxLen;
   
   CSwitchResult &sw = _switches[switchIndex];
   const CSwitchForm &form = switchForms[switchIndex];
@@ -107,7 +107,7 @@ bool CParser::ParseString(const UString &s, const CSwitchForm *switchForms, unsi
 
   sw.ThereIs = true;
 
-  const unsigned rem = s.Len() - pos;
+  int rem = s.Len() - pos;
   if (rem < form.MinLen)
   {
     ErrorMessage = "Too short switch:";
@@ -178,7 +178,7 @@ bool CParser::ParseStrings(const CSwitchForm *switchForms, unsigned numSwitches,
     {
       if (s.IsEqualTo(kStopSwitchParsing))
       {
-        StopSwitchIndex = (int)NonSwitchStrings.Size();
+        StopSwitchIndex = NonSwitchStrings.Size();
         continue;
       }
       if (!s.IsEmpty() && IsItSwitchChar(s[0]))

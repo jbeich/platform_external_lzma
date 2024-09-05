@@ -34,7 +34,7 @@ static HRESULT SResToHRESULT_Code(SRes res) throw()
 HRESULT CDecoder::Decode(ISequentialInStream *seqInStream, ISequentialOutStream *outStream,
     const UInt64 *outSizeLimit, bool finishStream, ICompressProgressInfo *progress)
 {
-  MainDecodeSRes = SZ_OK;
+  MainDecodeSRes = S_OK;
   MainDecodeSRes_wasUsed = false;
   XzStatInfo_Clear(&Stat);
 
@@ -50,10 +50,10 @@ HRESULT CDecoder::Decode(ISequentialInStream *seqInStream, ISequentialOutStream 
 
   int isMT = False;
 
-  #ifndef Z7_ST
+  #ifndef _7ZIP_ST
   {
     props.numThreads = 1;
-    const UInt32 numThreads = _numThreads;
+    UInt32 numThreads = _numThreads;
 
     if (_tryMt && numThreads > 1)
     {
@@ -87,7 +87,7 @@ HRESULT CDecoder::Decode(ISequentialInStream *seqInStream, ISequentialOutStream 
 
   MainDecodeSRes = res;
 
-  #ifndef Z7_ST
+  #ifndef _7ZIP_ST
   // _tryMt = isMT;
   #endif
 
@@ -95,7 +95,7 @@ HRESULT CDecoder::Decode(ISequentialInStream *seqInStream, ISequentialOutStream 
   RET_IF_WRAP_ERROR(progressWrap.Res, res, SZ_ERROR_PROGRESS)
   RET_IF_WRAP_ERROR_CONFIRMED(inWrap.Res, res, SZ_ERROR_READ)
 
-  // return E_OUTOFMEMORY; // for debug check
+  // return E_OUTOFMEMORY;
 
   MainDecodeSRes_wasUsed = true;
 
@@ -113,33 +113,33 @@ HRESULT CDecoder::Decode(ISequentialInStream *seqInStream, ISequentialOutStream 
 }
 
 
-Z7_COM7F_IMF(CComDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-    const UInt64 * /* inSize */, const UInt64 *outSize, ICompressProgressInfo *progress))
+HRESULT CComDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+    const UInt64 * /* inSize */, const UInt64 *outSize, ICompressProgressInfo *progress)
 {
   return Decode(inStream, outStream, outSize, _finishStream, progress);
 }
 
-Z7_COM7F_IMF(CComDecoder::SetFinishMode(UInt32 finishMode))
+STDMETHODIMP CComDecoder::SetFinishMode(UInt32 finishMode)
 {
   _finishStream = (finishMode != 0);
   return S_OK;
 }
 
-Z7_COM7F_IMF(CComDecoder::GetInStreamProcessedSize(UInt64 *value))
+STDMETHODIMP CComDecoder::GetInStreamProcessedSize(UInt64 *value)
 {
   *value = Stat.InSize;
   return S_OK;
 }
 
-#ifndef Z7_ST
+#ifndef _7ZIP_ST
 
-Z7_COM7F_IMF(CComDecoder::SetNumberOfThreads(UInt32 numThreads))
+STDMETHODIMP CComDecoder::SetNumberOfThreads(UInt32 numThreads)
 {
   _numThreads = numThreads;
   return S_OK;
 }
 
-Z7_COM7F_IMF(CComDecoder::SetMemLimit(UInt64 memUsage))
+STDMETHODIMP CComDecoder::SetMemLimit(UInt64 memUsage)
 {
   _memUsage = memUsage;
   return S_OK;
