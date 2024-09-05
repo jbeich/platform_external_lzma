@@ -48,15 +48,15 @@ bool CStdInStream::ScanAStringUntilNewLine(AString &s)
   s.Empty();
   for (;;)
   {
-    const int intChar = GetChar();
+    int intChar = GetChar();
     if (intChar == EOF)
       return true;
-    const char c = (char)intChar;
+    char c = (char)intChar;
     if (c == 0)
       return false;
     if (c == '\n')
       return true;
-    s.Add_Char(c);
+    s += c;
   }
 }
 
@@ -64,14 +64,14 @@ bool CStdInStream::ScanUStringUntilNewLine(UString &dest)
 {
   dest.Empty();
   AString s;
-  const bool res = ScanAStringUntilNewLine(s);
+  bool res = ScanAStringUntilNewLine(s);
   int codePage = CodePage;
   if (codePage == -1)
     codePage = CP_OEMCP;
-  if ((unsigned)codePage == CP_UTF8)
+  if (codePage == CP_UTF8)
     ConvertUTF8ToUnicode(s, dest);
   else
-    MultiByteToUnicodeString2(dest, s, (UINT)(unsigned)codePage);
+    MultiByteToUnicodeString2(dest, s, (UINT)codePage);
   return res;
 }
 

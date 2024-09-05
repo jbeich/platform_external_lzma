@@ -322,7 +322,7 @@ void CParsedPath::ParsePath(const UString &path)
   {
     case NPathType::kLocal:
     {
-      const int posDiskDelimiter = path.Find(kDiskDelimiter);
+      int posDiskDelimiter = path.Find(kDiskDelimiter);
       if (posDiskDelimiter >= 0)
       {
         curPos = posDiskDelimiter + 1;
@@ -352,8 +352,7 @@ UString CParsedPath::MergePath() const
   FOR_VECTOR (i, PathParts)
   {
     if (i != 0)
-      // result += kDirDelimiter;
-      result.Add_PathSepar();
+      result += kDirDelimiter;
     result += PathParts[i];
   }
   return result;

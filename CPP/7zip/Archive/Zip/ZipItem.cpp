@@ -55,15 +55,15 @@ void CExtraSubBlock::PrintInfo(AString &s) const
       {
         if (Data.Size() >= 1)
         {
-          s.Add_Colon();
+          s += ':';
           const Byte flags = Data[0];
-          if (flags & 1) s.Add_Char('M');
-          if (flags & 2) s.Add_Char('A');
-          if (flags & 4) s.Add_Char('C');
+          if (flags & 1) s += 'M';
+          if (flags & 2) s += 'A';
+          if (flags & 4) s += 'C';
           const UInt32 size = (UInt32)(Data.Size()) - 1;
           if (size % 4 == 0)
           {
-            s.Add_Colon();
+            s += ':';
             s.Add_UInt32(size / 4);
           }
         }
@@ -88,7 +88,7 @@ void CExtraSubBlock::PrintInfo(AString &s) const
     }
   }
   {
-    char sz[16];
+    char sz[32];
     sz[0] = '0';
     sz[1] = 'x';
     ConvertUInt32ToHex(ID, sz + 2);
@@ -291,7 +291,6 @@ bool CItem::IsDir() const
       case NHostOS::kHPFS:
       case NHostOS::kVFAT:
         return true;
-      default: break;
     }
   }
 
@@ -361,7 +360,6 @@ UInt32 CItem::GetWinAttrib() const
         // #endif
       }
       break;
-    default: break;
   }
   if (IsDir()) // test it;
     winAttrib |= FILE_ATTRIBUTE_DIRECTORY;

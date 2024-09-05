@@ -10,17 +10,30 @@ namespace NDecoder {
 
 static const UInt32 kWindowSizeMin = 1 << 16;
 
+static bool CheckCodeLens(const Byte *lens, unsigned num)
+{
+  UInt32 sum = 0;
+  for (unsigned i = 0; i < num; i++)
+  {
+    const unsigned len = lens[i];
+    if (len != 0)
+      sum += ((UInt32)1 << (NUM_CODE_BITS - len));
+  }
+  return sum == ((UInt32)1 << NUM_CODE_BITS);
+}
+
 bool CCoder::ReadTP(unsigned num, unsigned numBits, int spec)
 {
   _symbolT = -1;
 
-  const unsigned n = (unsigned)_inBitStream.ReadBits(numBits);
+  const UInt32 n = _inBitStream.ReadBits(numBits);
   if (n == 0)
   {
-    const unsigned s = (unsigned)_inBitStream.ReadBits(numBits);
+    const unsigned s = _inBitStream.ReadBits(numBits);
     _symbolT = (int)s;
     return (s < num);
   }
+
   if (n > num)
     return false;
 
@@ -29,31 +42,37 @@ bool CCoder::ReadTP(unsigned num, unsigned numBits, int spec)
     unsigned i;
     for (i = 0; i < NPT; i++)
       lens[i] = 0;
+
     i = 0;
+    
     do
     {
-      unsigned val = (unsigned)_inBitStream.GetValue(16);
+      const UInt32 val = _inBitStream.GetValue(16);
       unsigned c = val >> 13;
-      unsigned mov = 3;
+      
       if (c == 7)
       {
-        while (val & (1 << 12))
+        UInt32 mask = 1 << 12;
+        while (mask & val)
         {
-          val += val;
+          mask >>= 1;
           c++;
         }
         if (c > 16)
           return false;
-        mov = c - 3;
       }
+      
+      _inBitStream.MovePos(c < 7 ? 3 : c - 3);
       lens[i++] = (Byte)c;
-      _inBitStream.MovePos(mov);
-      if ((int)i == spec)
+      
+      if (i == (unsigned)spec)
         i += _inBitStream.ReadBits(2);
     }
     while (i < n);
     
-    return _decoderT.Build(lens, NHuffman::k_BuildMode_Full);
+    if (!CheckCodeLens(lens, NPT))
+      return false;
+    return _decoderT.Build(lens);
   }
 }
 
@@ -63,24 +82,28 @@ bool CCoder::ReadC()
 {
   _symbolC = -1;
 
-  const unsigned n = (unsigned)_inBitStream.ReadBits(NUM_C_BITS);
+  unsigned n = _inBitStream.ReadBits(NUM_C_BITS);
+  
   if (n == 0)
   {
-    const unsigned s = (unsigned)_inBitStream.ReadBits(NUM_C_BITS);
+    const unsigned s = _inBitStream.ReadBits(NUM_C_BITS);
     _symbolC = (int)s;
     return (s < NC);
   }
+
   if (n > NC)
     return false;
 
   {
     Byte lens[NC];
+
     unsigned i = 0;
+  
     do
     {
-      unsigned c = (unsigned)_symbolT;
+      UInt32 c = (unsigned)_symbolT;
       if (_symbolT < 0)
-        c = _decoderT.DecodeFull(&_inBitStream);
+        c = _decoderT.Decode(&_inBitStream);
       
       if (c <= 2)
       {
@@ -103,13 +126,19 @@ bool CCoder::ReadC()
     }
     while (i < n);
     
-    while (i < NC) lens[i++] = 0;
-    return _decoderC.Build(lens, /* n, */ NHuffman::k_BuildMode_Full);
+    while (i < NC)
+      lens[i++] = 0;
+    
+    if (!CheckCodeLens(lens, NC))
+      return false;
+    return _decoderC.Build(lens);
   }
 }
 
-HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
+HRESULT CCoder::CodeReal(UInt64 rem, ICompressProgressInfo *progress)
 {
+  const unsigned pbit = (DictSize <= (1 << 14) ? 4 : 5);
+
   UInt32 blockSize = 0;
 
   while (rem != 0)
@@ -118,6 +147,7 @@ HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
     {
       if (_inBitStream.ExtraBitsWereRead())
         return S_FALSE;
+
       if (progress)
       {
         const UInt64 packSize = _inBitStream.GetProcessedSize();
@@ -133,16 +163,15 @@ HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
         return S_FALSE;
       if (!ReadC())
         return S_FALSE;
-      const unsigned pbit = (DictSize <= (1 << 14) ? 4 : 5);
       if (!ReadTP(NP, pbit, -1))
         return S_FALSE;
     }
   
     blockSize--;
 
-    unsigned number = (unsigned)_symbolC;
+    UInt32 number = (unsigned)_symbolC;
     if (_symbolC < 0)
-      number = _decoderC.DecodeFull(&_inBitStream);
+      number = _decoderC.Decode(&_inBitStream);
 
     if (number < 256)
     {
@@ -151,11 +180,11 @@ HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
     }
     else
     {
-      const unsigned len = number - 256 + kMatchMinLen;
+      UInt32 len = number - 256 + kMatchMinLen;
 
-      UInt32 dist = (UInt32)(unsigned)_symbolT;
+      UInt32 dist = (unsigned)_symbolT;
       if (_symbolT < 0)
-        dist = (UInt32)_decoderT.DecodeFull(&_inBitStream);
+        dist = _decoderT.Decode(&_inBitStream);
       
       if (dist > 1)
       {
@@ -167,11 +196,7 @@ HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
         return S_FALSE;
 
       if (len > rem)
-      {
-        // if (FinishMode)
-        return S_FALSE;
-        // len = (unsigned)rem;
-      }
+        len = (UInt32)rem;
 
       if (!_outWindow.CopyBlock(dist, len))
         return S_FALSE;
@@ -179,37 +204,44 @@ HRESULT CCoder::CodeReal(UInt32 rem, ICompressProgressInfo *progress)
     }
   }
 
-  // if (FinishMode)
+  if (FinishMode)
   {
     if (blockSize != 0)
       return S_FALSE;
     if (_inBitStream.ReadAlignBits() != 0)
       return S_FALSE;
   }
+
   if (_inBitStream.ExtraBitsWereRead())
     return S_FALSE;
+
   return S_OK;
 }
 
 
-HRESULT CCoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-    const UInt32 outSize, ICompressProgressInfo *progress)
+Z7_COM7F_IMF(CCoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+    const UInt64 * /* inSize */, const UInt64 *outSize, ICompressProgressInfo *progress))
 {
   try
   {
+    if (!outSize)
+      return E_INVALIDARG;
+    
     if (!_outWindow.Create(DictSize > kWindowSizeMin ? DictSize : kWindowSizeMin))
       return E_OUTOFMEMORY;
     if (!_inBitStream.Create(1 << 17))
       return E_OUTOFMEMORY;
+    
     _outWindow.SetStream(outStream);
     _outWindow.Init(false);
     _inBitStream.SetStream(inStream);
     _inBitStream.Init();
-    {
-      CCoderReleaser coderReleaser(this);
-      RINOK(CodeReal(outSize, progress))
-      coderReleaser.Disable();
-    }
+    
+    CCoderReleaser coderReleaser(this);
+    
+    RINOK(CodeReal(*outSize, progress))
+
+    coderReleaser.Disable();
     return _outWindow.Flush();
   }
   catch(const CInBufferException &e) { return e.ErrorCode; }

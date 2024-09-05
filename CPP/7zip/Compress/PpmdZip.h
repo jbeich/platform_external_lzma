@@ -15,13 +15,20 @@
 namespace NCompress {
 namespace NPpmdZip {
 
+static const UInt32 kBufSize = (1 << 20);
+
 struct CBuf
 {
   Byte *Buf;
   
   CBuf(): Buf(NULL) {}
   ~CBuf() { ::MidFree(Buf); }
-  bool Alloc();
+  bool Alloc()
+  {
+    if (!Buf)
+      Buf = (Byte *)::MidAlloc(kBufSize);
+    return (Buf != NULL);
+  }
 };
 
 
@@ -31,10 +38,10 @@ Z7_CLASS_IMP_NOQIB_3(
   , ICompressSetFinishMode
   , ICompressGetInStreamProcessedSize
 )
-  bool _fullFileMode;
   CByteInBufWrap _inStream;
   CBuf _outStream;
   CPpmd8 _ppmd;
+  bool _fullFileMode;
 public:
   CDecoder(bool fullFileMode = true);
   ~CDecoder();

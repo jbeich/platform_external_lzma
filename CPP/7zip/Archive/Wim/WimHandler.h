@@ -12,7 +12,7 @@
 namespace NArchive {
 namespace NWim {
 
-const Int32 kNumImagesMaxUpdate = 1 << 10;
+static const Int32 kNumImagesMaxUpdate = (1 << 10);
 
 Z7_CLASS_IMP_CHandler_IInArchive_5(
     IArchiveGetRawProps
@@ -23,17 +23,16 @@ Z7_CLASS_IMP_CHandler_IInArchive_5(
 )
   CDatabase _db;
   UInt32 _version;
+  bool _isOldVersion;
   UInt32 _bootIndex;
 
   CObjectVector<CVolume> _volumes;
   CObjectVector<CWimXml> _xmls;
   // unsigned _nameLenForStreams;
- 
+  bool _xmlInComments;
+  
   unsigned _numXmlItems;
   unsigned _numIgnoreItems;
-
-  bool _isOldVersion;
-  bool _xmlInComments;
 
   bool _xmlError;
   bool _isArc;
@@ -44,17 +43,16 @@ Z7_CLASS_IMP_CHandler_IInArchive_5(
   int _defaultImageNumber;
 
   bool _showImageNumber;
+
   bool _keepMode_ShowImageNumber;
-  bool _disable_Sha1Check;
 
   UInt64 _phySize;
-  Int32 _firstVolumeIndex;
+  int _firstVolumeIndex;
 
   CHandlerTimeOptions _timeOptions;
 
   void InitDefaults()
   {
-    _disable_Sha1Check = false;
     _set_use_ShowImageNumber = false;
     _set_showImageNumber = false;
     _defaultImageNumber = -1;

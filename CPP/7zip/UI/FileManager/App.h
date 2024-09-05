@@ -203,19 +203,11 @@ public:
   int GetTimestampLevel() const { return Panels[LastFocusedPanel]._timestampLevel; }
   void SetTimestampLevel(int level)
   {
-    for (unsigned i = 0; i < kNumPanelsMax; i++)
+    unsigned i;
+    for (i = 0; i < kNumPanelsMax; i++)
     {
       CPanel &panel = Panels[i];
       panel._timestampLevel = level;
-    }
-    RedrawListItems_InPanels();
-  }
-
-  void RedrawListItems_InPanels()
-  {
-    for (unsigned i = 0; i < kNumPanelsMax; i++)
-    {
-      CPanel &panel = Panels[i];
       if (panel.PanelCreated)
         panel.RedrawListItems();
     }

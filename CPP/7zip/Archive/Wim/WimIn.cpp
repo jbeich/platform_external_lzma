@@ -34,19 +34,19 @@
 namespace NArchive {
 namespace NWim {
 
-static bool inline GetLog_val_min_dest(const UInt32 val, unsigned i, unsigned &dest)
+static int inline GetLog(UInt32 num)
 {
-  UInt32 v = (UInt32)1 << i;
-  for (; i < 32; i++)
-  {
-    if (v == val)
-    {
-      dest = i;
-      return true;
-    }
-    v += v;
-  }
-  return false;
+  for (int i = 0; i < 32; i++)
+    if (((UInt32)1 << i) == num)
+      return i;
+  return -1;
+}
+
+
+CUnpacker::~CUnpacker()
+{
+  if (lzmsDecoder)
+    delete lzmsDecoder;
 }
 
 
@@ -64,27 +64,25 @@ HRESULT CUnpacker::UnpackChunk(
   }
   else if (method == NMethod::kLZX)
   {
-    lzxDecoder.Create_if_Empty();
-    lzxDecoder->Set_WimMode(true);
+    if (!lzxDecoder)
+    {
+      lzxDecoderSpec = new NCompress::NLzx::CDecoder(true);
+      lzxDecoder = lzxDecoderSpec;
+    }
   }
   else if (method == NMethod::kLZMS)
   {
-    lzmsDecoder.Create_if_Empty();
+    if (!lzmsDecoder)
+      lzmsDecoder = new NCompress::NLzms::CDecoder();
   }
   else
     return E_NOTIMPL;
 
   const size_t chunkSize = (size_t)1 << chunkSizeBits;
-
-  {
-    const unsigned
-        kAdditionalOutputBufSize = MyMax(NCompress::NLzx::
-        kAdditionalOutputBufSize,        NCompress::NXpress::
-        kAdditionalOutputBufSize);
-    unpackBuf.EnsureCapacity(chunkSize + kAdditionalOutputBufSize);
-    if (!unpackBuf.Data)
-      return E_OUTOFMEMORY;
-  }
+  
+  unpackBuf.EnsureCapacity(chunkSize);
+  if (!unpackBuf.Data)
+    return E_OUTOFMEMORY;
   
   HRESULT res = S_FALSE;
   size_t unpackedSize = 0;
@@ -97,32 +95,30 @@ HRESULT CUnpacker::UnpackChunk(
   }
   else if (inSize < chunkSize)
   {
-    const unsigned kAdditionalInputSize = 32;
-    packBuf.EnsureCapacity(chunkSize + kAdditionalInputSize);
+    packBuf.EnsureCapacity(chunkSize);
     if (!packBuf.Data)
       return E_OUTOFMEMORY;
     
     RINOK(ReadStream_FALSE(inStream, packBuf.Data, inSize))
-    memset(packBuf.Data + inSize, 0xff, kAdditionalInputSize);
 
     TotalPacked += inSize;
     
     if (method == NMethod::kXPRESS)
     {
-      res = NCompress::NXpress::Decode_WithExceedWrite(packBuf.Data, inSize, unpackBuf.Data, outSize);
+      res = NCompress::NXpress::Decode(packBuf.Data, inSize, unpackBuf.Data, outSize);
       if (res == S_OK)
         unpackedSize = outSize;
     }
     else if (method == NMethod::kLZX)
     {
-      res = lzxDecoder->Set_ExternalWindow_DictBits(unpackBuf.Data, chunkSizeBits);
+      res = lzxDecoderSpec->SetExternalWindow(unpackBuf.Data, chunkSizeBits);
       if (res != S_OK)
         return E_NOTIMPL;
-      lzxDecoder->Set_KeepHistoryForNext(false);
-      lzxDecoder->Set_KeepHistory(false);
-      res = lzxDecoder->Code_WithExceedReadWrite(packBuf.Data, inSize, (UInt32)outSize);
-      unpackedSize = lzxDecoder->GetUnpackSize();
-      if (res == S_OK && !lzxDecoder->WasBlockFinished())
+      lzxDecoderSpec->KeepHistoryForNext = false;
+      lzxDecoderSpec->SetKeepHistory(false);
+      res = lzxDecoderSpec->Code(packBuf.Data, inSize, (UInt32)outSize);
+      unpackedSize = lzxDecoderSpec->GetUnpackSize();
+      if (res == S_OK && !lzxDecoderSpec->WasBlockFinished())
         res = S_FALSE;
     }
     else
@@ -162,21 +158,26 @@ HRESULT CUnpacker::Unpack2(
 {
   if (!resource.IsCompressed() && !resource.IsSolid())
   {
-    copyCoder.Create_if_Empty();
+    if (!copyCoder)
+    {
+      copyCoderSpec = new NCompress::CCopyCoder;
+      copyCoder = copyCoderSpec;
+    }
 
-    CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> limitedStream;
-    limitedStream->SetStream(inStream);
+    CLimitedSequentialInStream *limitedStreamSpec = new CLimitedSequentialInStream();
+    CMyComPtr<ISequentialInStream> limitedStream = limitedStreamSpec;
+    limitedStreamSpec->SetStream(inStream);
     
     RINOK(InStream_SeekSet(inStream, resource.Offset))
     if (resource.PackSize != resource.UnpackSize)
       return S_FALSE;
 
-    limitedStream->Init(resource.PackSize);
+    limitedStreamSpec->Init(resource.PackSize);
     TotalPacked += resource.PackSize;
     
-    HRESULT res = copyCoder.Interface()->Code(limitedStream, outStream, NULL, NULL, progress);
+    HRESULT res = copyCoder->Code(limitedStream, outStream, NULL, NULL, progress);
     
-    if (res == S_OK && copyCoder->TotalSize != resource.UnpackSize)
+    if (res == S_OK && copyCoderSpec->TotalSize != resource.UnpackSize)
       res = S_FALSE;
     return res;
   }
@@ -365,13 +366,24 @@ HRESULT CUnpacker::Unpack2(
 HRESULT CUnpacker::Unpack(IInStream *inStream, const CResource &resource, const CHeader &header, const CDatabase *db,
     ISequentialOutStream *outStream, ICompressProgressInfo *progress, Byte *digest)
 {
-  CMyComPtr2_Create<ISequentialOutStream, COutStreamWithSha1> shaStream;
+  COutStreamWithSha1 *shaStreamSpec = NULL;
+  CMyComPtr<ISequentialOutStream> shaStream;
+  
   // outStream can be NULL, so we use COutStreamWithSha1 even if sha1 is not required
-  shaStream->SetStream(outStream);
-  shaStream->Init(digest != NULL);
-  const HRESULT res = Unpack2(inStream, resource, header, db, shaStream, progress);
+  // if (digest)
+  {
+    shaStreamSpec = new COutStreamWithSha1();
+    shaStream = shaStreamSpec;
+    shaStreamSpec->SetStream(outStream);
+    shaStreamSpec->Init(digest != NULL);
+    outStream = shaStream;
+  }
+  
+  HRESULT res = Unpack2(inStream, resource, header, db, outStream, progress);
+  
   if (digest)
-    shaStream->Final(digest);
+    shaStreamSpec->Final(digest);
+  
   return res;
 }
 
@@ -382,16 +394,21 @@ HRESULT CUnpacker::UnpackData(IInStream *inStream,
     CByteBuffer &buf, Byte *digest)
 {
   // if (resource.IsSolid()) return E_NOTIMPL;
+
   UInt64 unpackSize64 = resource.UnpackSize;
   if (db)
     unpackSize64 = db->Get_UnpackSize_of_Resource(resource);
-  const size_t size = (size_t)unpackSize64;
+
+  size_t size = (size_t)unpackSize64;
   if (size != unpackSize64)
     return E_OUTOFMEMORY;
+
   buf.Alloc(size);
 
-  CMyComPtr2_Create<ISequentialOutStream, CBufPtrSeqOutStream> outStream;
-  outStream->Init((Byte *)buf, size);
+  CBufPtrSeqOutStream *outStreamSpec = new CBufPtrSeqOutStream();
+  CMyComPtr<ISequentialOutStream> outStream = outStreamSpec;
+  outStreamSpec->Init((Byte *)buf, size);
+
   return Unpack(inStream, resource, header, db, outStream, NULL, digest);
 }
 
@@ -883,8 +900,10 @@ HRESULT CHeader::Parse(const Byte *p, UInt64 &phySize)
     ChunkSizeBits = kChunkSizeBits;
     if (ChunkSize != 0)
     {
-      if (!GetLog_val_min_dest(ChunkSize, 12, ChunkSizeBits))
+      const int log = GetLog(ChunkSize);
+      if (log < 12)
         return S_FALSE;
+      ChunkSizeBits = (unsigned)log;
     }
   }
 
@@ -1295,21 +1314,23 @@ HRESULT CDatabase::FillAndCheck(const CObjectVector<CVolume> &volumes)
             return S_FALSE;
 
           const UInt32 solidChunkSize = GetUi32(header + 8);
-          if (!GetLog_val_min_dest(solidChunkSize, 8, ss.ChunkSizeBits))
+          const int log = GetLog(solidChunkSize);
+          if (log < 8 || log > 31)
             return S_FALSE;
+          ss.ChunkSizeBits = (unsigned)log;
           ss.Method = (Int32)GetUi32(header + 12);
           
-          const UInt64 numChunks64 = (ss.UnpackSize + (((UInt32)1 << ss.ChunkSizeBits) - 1)) >> ss.ChunkSizeBits;
-          const UInt64 sizesBufSize64 = 4 * numChunks64;
+          UInt64 numChunks64 = (ss.UnpackSize + (((UInt32)1 << ss.ChunkSizeBits) - 1)) >> ss.ChunkSizeBits;
+          UInt64 sizesBufSize64 = 4 * numChunks64;
           ss.HeadersSize = kSolidHeaderSize + sizesBufSize64;
-          const size_t sizesBufSize = (size_t)sizesBufSize64;
+          size_t sizesBufSize = (size_t)sizesBufSize64;
           if (sizesBufSize != sizesBufSize64)
             return E_OUTOFMEMORY;
           sizesBuf.AllocAtLeast(sizesBufSize);
           
           RINOK(ReadStream_FALSE(inStream, sizesBuf, sizesBufSize))
           
-          const size_t numChunks = (size_t)numChunks64;
+          size_t numChunks = (size_t)numChunks64;
           ss.Chunks.Alloc(numChunks + 1);
 
           UInt64 offset = 0;
@@ -1418,7 +1439,7 @@ HRESULT CDatabase::FillAndCheck(const CObjectVector<CVolume> &volumes)
   
   {
     {
-      const CStreamInfo *streams = DataStreams.ConstData();
+      const CStreamInfo *streams = &DataStreams.Front();
 
       if (IsOldVersion)
       {
@@ -1460,7 +1481,7 @@ HRESULT CDatabase::FillAndCheck(const CObjectVector<CVolume> &volumes)
           hash += (item.IsAltStream ? 0x8 : 0x10);
           UInt32 id = GetUi32(hash);
           if (id != 0)
-            item.StreamIndex = FindId(DataStreams.ConstData(), sortedByHash, id);
+            item.StreamIndex = FindId(&DataStreams.Front(), sortedByHash, id);
         }
       }
       /*
@@ -1474,7 +1495,7 @@ HRESULT CDatabase::FillAndCheck(const CObjectVector<CVolume> &volumes)
         hash += (item.IsAltStream ? 0x10 : 0x40);
         if (!IsEmptySha(hash))
         {
-          item.StreamIndex = FindHash(DataStreams.ConstData(), sortedByHash, hash);
+          item.StreamIndex = FindHash(&DataStreams.Front(), sortedByHash, hash);
         }
       }
     }
@@ -1497,7 +1518,7 @@ HRESULT CDatabase::FillAndCheck(const CObjectVector<CVolume> &volumes)
     
     for (i = 0; i < Items.Size(); i++)
     {
-      const int streamIndex = Items[i].StreamIndex;
+      int streamIndex = Items[i].StreamIndex;
       if (streamIndex >= 0)
         refCounts[streamIndex]++;
     }
@@ -1752,12 +1773,13 @@ static bool ParseNumber32(const AString &s, UInt32 &res)
 
 static bool ParseTime(const CXmlItem &item, FILETIME &ft, const char *tag)
 {
-  const CXmlItem *timeItem = item.FindSubTag_GetPtr(tag);
-  if (timeItem)
+  int index = item.FindSubTag(tag);
+  if (index >= 0)
   {
+    const CXmlItem &timeItem = item.SubItems[index];
     UInt32 low = 0, high = 0;
-    if (ParseNumber32(timeItem->GetSubStringForTag("LOWPART"), low) &&
-        ParseNumber32(timeItem->GetSubStringForTag("HIGHPART"), high))
+    if (ParseNumber32(timeItem.GetSubStringForTag("LOWPART"), low) &&
+        ParseNumber32(timeItem.GetSubStringForTag("HIGHPART"), high))
     {
       ft.dwLowDateTime = low;
       ft.dwHighDateTime = high;

@@ -90,14 +90,15 @@ bool GetTextConfig(const AString &s, CObjectVector<CTextConfigPair> &pairs)
         c = s[pos++];
         switch (c)
         {
-          case 'n':  c = '\n';  break;
-          case 't':  c = '\t';  break;
-          case '\\':  break;
-          case '\"':  break;
-          default:  message += '\\';  break;
+          case 'n': message += '\n'; break;
+          case 't': message += '\t'; break;
+          case '\\': message += '\\'; break;
+          case '\"': message += '\"'; break;
+          default: message += '\\'; message += c; break;
         }
       }
-      message += c;
+      else
+        message += c;
     }
     if (!ConvertUTF8ToUnicode(message, pair.String))
       return false;

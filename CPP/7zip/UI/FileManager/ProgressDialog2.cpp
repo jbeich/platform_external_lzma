@@ -23,7 +23,6 @@
 using namespace NWindows;
 
 extern HINSTANCE g_hInstance;
-extern bool g_DisableUserQuestions;
 
 static const UINT_PTR kTimerID = 3;
 
@@ -978,7 +977,6 @@ INT_PTR CProgressDialog::Create(const UString &title, NWindows::CThread &thread,
   }
   thread.Wait_Close();
   if (!MessagesDisplayed)
-  if (!g_DisableUserQuestions)
     MessageBoxW(wndParent, L"Progress Error", L"7-Zip", MB_ICONERROR);
   return res;
 }
@@ -1014,8 +1012,7 @@ bool CProgressDialog::OnExternalCloseMessage()
     MessagesDisplayed = true;
     if (fm.ErrorMessage.Title.IsEmpty())
       fm.ErrorMessage.Title = "7-Zip";
-    if (!g_DisableUserQuestions)
-      MessageBoxW(*this, fm.ErrorMessage.Message, fm.ErrorMessage.Title, MB_ICONERROR);
+    MessageBoxW(*this, fm.ErrorMessage.Message, fm.ErrorMessage.Title, MB_ICONERROR);
   }
   else if (!thereAreMessages)
   {
@@ -1025,12 +1022,10 @@ bool CProgressDialog::OnExternalCloseMessage()
     {
       if (fm.OkMessage.Title.IsEmpty())
         fm.OkMessage.Title = "7-Zip";
-      if (!g_DisableUserQuestions)
-        MessageBoxW(*this, fm.OkMessage.Message, fm.OkMessage.Title, MB_OK);
+      MessageBoxW(*this, fm.OkMessage.Message, fm.OkMessage.Title, MB_OK);
     }
   }
 
-  if (!g_DisableUserQuestions)
   if (thereAreMessages && !_cancelWasPressed)
   {
     _waitCloseByCancelButton = true;
@@ -1089,7 +1084,7 @@ void CProgressDialog::SetTitleText()
     char temp[32];
     ConvertUInt64ToString(_prevPercentValue, temp);
     s += temp;
-    s.Add_Char('%');
+    s += '%';
   }
   if (!_foreground)
   {

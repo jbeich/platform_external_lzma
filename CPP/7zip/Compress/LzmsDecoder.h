@@ -4,13 +4,73 @@
 #ifndef ZIP7_INC_LZMS_DECODER_H
 #define ZIP7_INC_LZMS_DECODER_H
 
+// #define SHOW_DEBUG_INFO
+
+#ifdef SHOW_DEBUG_INFO
+#include <stdio.h>
+#define PRF(x) x
+#else
+// #define PRF(x)
+#endif
+
 #include "../../../C/CpuArch.h"
 #include "../../../C/HuffEnc.h"
+
+#include "../../Common/MyBuffer.h"
+#include "../../Common/MyCom.h"
+
+#include "../ICoder.h"
 
 #include "HuffmanDecoder.h"
 
 namespace NCompress {
 namespace NLzms {
+
+class CBitDecoder
+{
+public:
+  const Byte *_buf;
+  unsigned _bitPos;
+
+  void Init(const Byte *buf, size_t size) throw()
+  {
+    _buf = buf + size;
+    _bitPos = 0;
+  }
+
+  UInt32 GetValue(unsigned numBits) const
+  {
+    UInt32 v = ((UInt32)_buf[-1] << 16) | ((UInt32)_buf[-2] << 8) | (UInt32)_buf[-3];
+    v >>= (24 - numBits - _bitPos);
+    return v & ((1 << numBits) - 1);
+  }
+  
+  void MovePos(unsigned numBits)
+  {
+    _bitPos += numBits;
+    _buf -= (_bitPos >> 3);
+    _bitPos &= 7;
+  }
+
+  UInt32 ReadBits32(unsigned numBits)
+  {
+    UInt32 mask = (((UInt32)1 << numBits) - 1);
+    numBits += _bitPos;
+    const Byte *buf = _buf;
+    UInt32 v = GetUi32(buf - 4);
+    if (numBits > 32)
+    {
+      v <<= (numBits - 32);
+      v |= (UInt32)buf[-5] >> (40 - numBits);
+    }
+    else
+      v >>= (32 - numBits);
+    _buf = buf - (numBits >> 3);
+    _bitPos = numBits & 7;
+    return v & mask;
+  }
+};
+
 
 const unsigned k_NumLitSyms = 256;
 const unsigned k_NumLenSyms = 54;
@@ -46,17 +106,18 @@ public:
     // We need to check that our algorithm is OK, when optimal Huffman tree uses more than 15 levels !!!
     Huffman_Generate(Freqs, vals, levels, NumSyms, k_NumHuffmanBits);
 
+    /*
     for (UInt32 i = NumSyms; i < m_NumSyms; i++)
       levels[i] = 0;
-
-    this->Build(levels, /* NumSyms, */ NHuffman::k_BuildMode_Full);
+    */
+    this->BuildFull(levels, NumSyms);
   }
   
   void Rebuild() throw()
   {
     Generate();
     RebuildRem = m_RebuildFreq;
-    const UInt32 num = NumSyms;
+    UInt32 num = NumSyms;
     for (UInt32 i = 0; i < num; i++)
       Freqs[i] = (Freqs[i] >> 1) + 1;
   }
@@ -136,7 +197,7 @@ struct CRangeDecoder
     CProbEntry *entry = &probs[st];
     st = (st << 1) & (numStates - 1);
 
-    const UInt32 prob = entry->GetProb();
+    UInt32 prob = entry->GetProb();
 
     if (range <= 0xFFFF)
     {
@@ -147,7 +208,7 @@ struct CRangeDecoder
       cur += 2;
     }
 
-    const UInt32 bound = (range >> k_NumProbBits) * prob;
+    UInt32 bound = (range >> k_NumProbBits) * prob;
     
     if (code < bound)
     {
@@ -171,6 +232,7 @@ struct CRangeDecoder
 class CDecoder
 {
   // CRangeDecoder _rc;
+  // CBitDecoder _bs;
   size_t _pos;
 
   UInt32 _reps[k_NumReps + 1];

@@ -8,13 +8,13 @@ third_party {
   license_type: UNENCUMBERED
   last_upgrade_date {
     year: 2024
-    month: 5
-    day: 23
+    month: 4
+    day: 18
   }
   homepage: "https://7-zip.org/"
   identifier {
     type: "Archive"
-    value: "https://github.com/ip7z/7zip/archive/24.05.tar.gz"
-    version: "24.05"
+    value: "https://github.com/ip7z/7zip/archive/23.01.tar.gz"
+    version: "23.01"
   }
 }

@@ -12,15 +12,6 @@
 namespace NCompress {
 namespace NPpmdZip {
 
-static const UInt32 kBufSize = 1 << 20;
-
-bool CBuf::Alloc()
-{
-  if (!Buf)
-    Buf = (Byte *)::MidAlloc(kBufSize);
-  return (Buf != NULL);
-}
-
 CDecoder::CDecoder(bool fullFileMode):
   _fullFileMode(fullFileMode)
 {
@@ -264,10 +255,7 @@ Z7_COM7F_IMF(CEncoder::Code(ISequentialInStream *inStream, ISequentialOutStream 
   Ppmd8_Init(&_ppmd, (unsigned)_props.Order, (unsigned)_props.Restor);
 
   {
-    const unsigned val =
-           ((unsigned)_props.Order - 1)
-         + (((unsigned)_props.MemSizeMB - 1) << 4)
-         + ((unsigned)_props.Restor << 12);
+    const UInt32 val = (UInt32)(((unsigned)_props.Order - 1) + ((_props.MemSizeMB - 1) << 4) + ((unsigned)_props.Restor << 12));
     _outStream.WriteByte((Byte)(val & 0xFF));
     _outStream.WriteByte((Byte)(val >> 8));
   }
@@ -305,5 +293,8 @@ Z7_COM7F_IMF(CEncoder::Code(ISequentialInStream *inStream, ISequentialOutStream 
     }
   }
 }
+
+
+
 
 }}

@@ -66,10 +66,6 @@ extern
 LONG g_DllRefCount;
 LONG g_DllRefCount = 0; // Reference count of this DLL.
 
-extern
-bool g_DisableUserQuestions;
-bool g_DisableUserQuestions;
-
 
 // #define ODS(sz) OutputDebugStringW(L#sz)
 #define ODS(sz)

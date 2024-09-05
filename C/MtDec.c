@@ -1,5 +1,5 @@
 /* MtDec.c -- Multi-thread Decoder
-2024-02-20 : Igor Pavlov : Public domain */
+2023-04-02 : Igor Pavlov : Public domain */
 
 #include "Precomp.h"
 
@@ -809,16 +809,6 @@ static WRes MtDec_ThreadFunc2(CMtDecThread *t)
 #endif
 
 
-typedef
-  #ifdef _WIN32
-    UINT_PTR
-  #elif 1
-    uintptr_t
-  #else
-    ptrdiff_t
-  #endif
-    MY_uintptr_t;
-
 static THREAD_FUNC_DECL MtDec_ThreadFunc1(void *pp)
 {
   WRes res;
@@ -831,7 +821,7 @@ static THREAD_FUNC_DECL MtDec_ThreadFunc1(void *pp)
   res = MtDec_ThreadFunc2(t);
   p = t->mtDec;
   if (res == 0)
-    return (THREAD_FUNC_RET_TYPE)(MY_uintptr_t)p->exitThreadWRes;
+    return (THREAD_FUNC_RET_TYPE)(UINT_PTR)p->exitThreadWRes;
   {
     // it's unexpected situation for some threading function error
     if (p->exitThreadWRes == 0)
@@ -842,7 +832,7 @@ static THREAD_FUNC_DECL MtDec_ThreadFunc1(void *pp)
     Event_Set(&p->threads[0].canWrite);
     MtProgress_SetError(&p->mtProgress, MY_SRes_HRESULT_FROM_WRes(res));
   }
-  return (THREAD_FUNC_RET_TYPE)(MY_uintptr_t)res;
+  return (THREAD_FUNC_RET_TYPE)(UINT_PTR)res;
 }
 
 static Z7_NO_INLINE THREAD_FUNC_DECL MtDec_ThreadFunc(void *pp)
@@ -1082,7 +1072,7 @@ SRes MtDec_Code(CMtDec *p)
     if (wres == 0) { wres = Event_Set(&nextThread->canWrite);
     if (wres == 0) { wres = Event_Set(&nextThread->canRead);
     if (wres == 0) { THREAD_FUNC_RET_TYPE res = MtDec_ThreadFunc(nextThread);
-    wres = (WRes)(MY_uintptr_t)res;
+    wres = (WRes)(UINT_PTR)res;
     if (wres != 0)
     {
       p->needContinue = False;

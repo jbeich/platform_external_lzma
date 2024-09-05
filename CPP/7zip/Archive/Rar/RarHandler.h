@@ -80,8 +80,6 @@ class CHandler Z7_final:
   Z7_IFACE_COM7_IMP(IInArchive)
   DECL_ISetCompressCodecsInfo
 
-  bool _isArc;
-
   CRecordVector<CRefItem> _refItems;
   CObjectVector<CItem> _items;
   CObjectVector<CArc> _arcs;
@@ -89,6 +87,7 @@ class CHandler Z7_final:
   // AString _errorMessage;
   UInt32 _errorFlags;
   UInt32 _warningFlags;
+  bool _isArc;
   UString _missingVolName;
 
   DECL_EXTERNAL_CODECS_VARS
@@ -100,7 +99,7 @@ class CHandler Z7_final:
   void AddErrorMessage(const AString &s)
   {
     if (!_errorMessage.IsEmpty())
-      _errorMessage.Add_LF();
+      _errorMessage += '\n';
     _errorMessage += s;
   }
   */

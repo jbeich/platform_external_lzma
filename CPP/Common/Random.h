@@ -7,7 +7,7 @@ class CRandom
 {
 public:
   void Init();
-  void Init(unsigned seed);
+  void Init(unsigned int seed);
   int Generate() const;
 };
 

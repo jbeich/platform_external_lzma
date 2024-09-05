@@ -37,8 +37,6 @@ bool EnablePrivilege(LPCTSTR privilegeName, bool enable)
   if (!hModule)
     return false;
   
-Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
-
   GET_PROC_ADDR(
      OpenProcessToken,
     "OpenProcessToken")
@@ -81,7 +79,6 @@ Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
 }
 
 
-Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
 
 typedef void (WINAPI * Func_RtlGetVersion) (OSVERSIONINFOEXW *);
 

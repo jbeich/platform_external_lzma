@@ -167,7 +167,6 @@ public:
 
   COpenCallbackImp():
       _subArchiveMode(false),
-      PasswordWasAsked(false),
       ReOpenCallback(NULL),
       Callback(NULL)  {}
   

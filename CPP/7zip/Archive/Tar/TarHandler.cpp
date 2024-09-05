@@ -39,9 +39,6 @@ static const Byte kProps[] =
   kpidCTime,
   kpidATime,
   kpidPosixAttrib,
-#if 0
-  kpidAttrib,
-#endif
   kpidUser,
   kpidGroup,
   kpidUserId,
@@ -82,14 +79,13 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       UInt32 flags = 0;
       if (!_isArc)
         flags |= kpv_ErrorFlags_IsNotArc;
-      else switch ((int)_arc._error)
+      else switch (_arc._error)
       {
         case k_ErrorType_UnexpectedEnd: flags = kpv_ErrorFlags_UnexpectedEnd; break;
         case k_ErrorType_Corrupted: flags = kpv_ErrorFlags_HeadersError; break;
-        // case k_ErrorType_OK: break;
+        case k_ErrorType_OK: break;
         // case k_ErrorType_Warning: break;
-        // case k_ErrorType_OK:
-        default: break;
+        // default: break;
       }
       if (flags != 0)
         prop = flags;
@@ -111,7 +107,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       {
         case CP_OEMCP: name = "OEM"; break;
         case CP_UTF8: name = "UTF-8"; break;
-        default: break;
       }
       if (!name)
       {
@@ -137,7 +132,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       if (_arc._are_mtime) s.Add_OptSpaced("mtime");
       if (_arc._are_atime) s.Add_OptSpaced("atime");
       if (_arc._are_ctime) s.Add_OptSpaced("ctime");
-      if (_arc._are_SCHILY_fflags) s.Add_OptSpaced("SCHILY.fflags");
       if (_arc._is_PaxGlobal_Error) s.Add_OptSpaced("PAX_GLOBAL_ERROR");
       s.Add_OptSpaced(_encodingCharacts.GetCharactsString());
       prop = s;
@@ -155,7 +149,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       }
       break;
     }
-    default: break;
   }
   prop.Detach(value);
   return S_OK;
@@ -361,8 +354,8 @@ Z7_COM7F_IMF(CHandler::GetNumberOfItems(UInt32 *numItems))
 
 CHandler::CHandler()
 {
-  // copyCoder = new NCompress::CCopyCoder();
-  // copyCoder = copyCoder;
+  copyCoderSpec = new NCompress::CCopyCoder();
+  copyCoder = copyCoderSpec;
   _openCodePage = CP_UTF8;
   Init();
 }
@@ -374,9 +367,9 @@ HRESULT CHandler::SkipTo(UInt32 index)
     if (_latestIsRead)
     {
       const UInt64 packSize = _latestItem.Get_PackSize_Aligned();
-      RINOK(copyCoder.Interface()->Code(_seqStream, NULL, &packSize, &packSize, NULL))
-      _arc._phySize += copyCoder->TotalSize;
-      if (copyCoder->TotalSize != packSize)
+      RINOK(copyCoder->Code(_seqStream, NULL, &packSize, &packSize, NULL))
+      _arc._phySize += copyCoderSpec->TotalSize;
+      if (copyCoderSpec->TotalSize != packSize)
       {
         _arc._error = k_ErrorType_UnexpectedEnd;
         return S_FALSE;
@@ -430,17 +423,27 @@ static void PaxTimeToProp(const CPaxTime &pt, NWindows::NCOM::CPropVariant &prop
 }
 
 
+#define ValToHex(t) ((char)(((t) < 10) ? ('0' + (t)) : ('a' + ((t) - 10))))
+
+static void AddByteToHex2(unsigned val, AString &s)
+{
+  unsigned t;
+  t = val >> 4;
+  s += ValToHex(t);
+  t = val & 0xF;
+  s += ValToHex(t);
+}
+
 static void AddSpecCharToString(const char c, AString &s)
 {
   if ((Byte)c <= 0x20 || (Byte)c > 127)
   {
-    s.Add_Char('[');
-    s.Add_Char(GET_HEX_CHAR_LOWER((Byte)c >> 4));
-    s.Add_Char(GET_HEX_CHAR_LOWER(c & 15));
-    s.Add_Char(']');
+    s += '[';
+    AddByteToHex2((Byte)(c), s);
+    s += ']';
   }
   else
-    s.Add_Char(c);
+    s += c;
 }
 
 static void AddSpecUInt64(AString &s, const char *name, UInt64 v)
@@ -450,7 +453,7 @@ static void AddSpecUInt64(AString &s, const char *name, UInt64 v)
     s.Add_OptSpaced(name);
     if (v > 1)
     {
-      s.Add_Colon();
+      s += ':';
       s.Add_UInt64(v);
     }
   }
@@ -462,34 +465,9 @@ static void AddSpecBools(AString &s, const char *name, bool b1, bool b2)
   {
     s.Add_OptSpaced(name);
     if (b2)
-      s.Add_Char('*');
+      s += '*';
   }
 }
-
-
-#if 0
-static bool Parse_Attrib_from_SCHILY_fflags(const AString &s, UInt32 &attribRes)
-{
-  UInt32 attrib = 0;
-  attribRes = attrib;
-  unsigned pos = 0;
-  while (pos < s.Len())
-  {
-    int pos2 = s.Find(',', pos);
-    if (pos2 < 0)
-      pos2 = (int)s.Len();
-    const AString str = s.Mid(pos, (unsigned)pos2 - pos);
-          if (str.IsEqualTo("hidden"))  attrib |= FILE_ATTRIBUTE_HIDDEN;
-    else  if (str.IsEqualTo("rdonly"))  attrib |= FILE_ATTRIBUTE_READONLY;
-    else  if (str.IsEqualTo("system"))  attrib |= FILE_ATTRIBUTE_SYSTEM;
-    else
-      return false;
-    pos = (unsigned)pos2 + 1;
-  }
-  attribRes = attrib;
-  return true;
-}
-#endif
 
 
 Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *value))
@@ -557,30 +535,7 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
         PaxTimeToProp(item->PaxTimes.CTime, prop);
       break;
     case kpidPosixAttrib: prop = item->Get_Combined_Mode(); break;
-
-    // kpidAttrib has priority over kpidPosixAttrib in 7-Zip.
-    // but if we want kpidPosixAttrib priority for TAR, we disable kpidAttrib.
-#if 0
-    case kpidAttrib:
-    {
-      if (!item->SCHILY_fflags.IsEmpty())
-      {
-        UInt32 attrib = 0;
-        if (Parse_Attrib_from_SCHILY_fflags(item->SCHILY_fflags, attrib))
-        {
-          if (attrib != 0)
-          {
-            if (item->IsDir())
-              attrib |= FILE_ATTRIBUTE_DIRECTORY;
-            attrib |= ((UInt32)item->Get_Combined_Mode() << 16) | 0x8000; // FILE_ATTRIBUTE_UNIX_EXTENSION;
-            prop = attrib;
-          }
-        }
-      }
-      break;
-    }
-#endif
-      
+    
     case kpidUser:
       if (!item->User.IsEmpty())
         TarStringToUnicode(item->User, prop);
@@ -679,11 +634,7 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
         s.Add_OptSpaced("pax_linkpath");
       if (item->pax_size_WasUsed)
         s.Add_OptSpaced("pax_size");
-      if (!item->SCHILY_fflags.IsEmpty())
-      {
-        s.Add_OptSpaced("SCHILY.fflags=");
-        s += item->SCHILY_fflags;
-      }
+
       if (item->IsThereWarning())
         s.Add_OptSpaced("WARNING");
       if (item->HeaderError)
@@ -708,7 +659,6 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
     }
     // case kpidHeadersSize: prop = item->HeaderSize; break; // for debug
     // case kpidOffset: prop = item->HeaderPos; break; // for debug
-    default: break;
   }
   prop.Detach(value);
   return S_OK;
@@ -734,29 +684,36 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   UInt32 i;
   for (i = 0; i < numItems; i++)
     totalSize += _items[allFilesMode ? i : indices[i]].Get_UnpackSize();
-  RINOK(extractCallback->SetTotal(totalSize))
+  extractCallback->SetTotal(totalSize);
 
   UInt64 totalPackSize;
   totalSize = totalPackSize = 0;
   
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
-  CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> inStream;
-  inStream->SetStream(stream);
-  CMyComPtr2_Create<ISequentialOutStream, CLimitedSequentialOutStream> outStreamSpec;
 
-  for (i = 0; ; i++)
+  CLimitedSequentialInStream *streamSpec = new CLimitedSequentialInStream;
+  CMyComPtr<ISequentialInStream> inStream(streamSpec);
+  streamSpec->SetStream(stream);
+
+  CLimitedSequentialOutStream *outStreamSpec = new CLimitedSequentialOutStream;
+  CMyComPtr<ISequentialOutStream> outStream(outStreamSpec);
+
+  for (i = 0; i < numItems || seqMode; i++)
   {
     lps->InSize = totalPackSize;
     lps->OutSize = totalSize;
     RINOK(lps->SetCur())
-    if (i >= numItems && !seqMode)
-      break;
+    CMyComPtr<ISequentialOutStream> realOutStream;
+    Int32 askMode = testMode ?
+        NExtract::NAskMode::kTest :
+        NExtract::NAskMode::kExtract;
     const UInt32 index = allFilesMode ? i : indices[i];
     const CItemEx *item;
     if (seqMode)
     {
-      const HRESULT res = SkipTo(index);
+      HRESULT res = SkipTo(index);
       if (res == E_INVALIDARG)
         break;
       RINOK(res)
@@ -765,10 +722,6 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     else
       item = &_items[index];
 
-    Int32 askMode = testMode ?
-        NExtract::NAskMode::kTest :
-        NExtract::NAskMode::kExtract;
-    CMyComPtr<ISequentialOutStream> realOutStream;
     RINOK(extractCallback->GetStream(index, &realOutStream, askMode))
     const UInt64 unpackSize = item->Get_UnpackSize();
     totalSize += unpackSize;
@@ -776,7 +729,6 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     if (item->IsDir())
     {
       RINOK(extractCallback->PrepareOperation(askMode))
-      // realOutStream.Release();
       RINOK(extractCallback->SetOperationResult(NExtract::NOperationResult::kOK))
       continue;
     }
@@ -786,10 +738,9 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
       if (!seqMode)
       {
         /*
-        // GetStream() creates link.
-        // so we can show extracting info in GetStream() instead
-        if (item->Is_HardLink() ||
-            item->Is_SymLink())
+        // probably we must show extracting info it callback handler instead
+        if (item->IsHardLink() ||
+            item->IsSymLink())
         {
           RINOK(extractCallback->PrepareOperation(askMode))
           RINOK(extractCallback->SetOperationResult(NExtract::NOperationResult::kOK))
@@ -828,8 +779,8 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
         {
           RINOK(InStream_SeekSet(_stream, item->Get_DataPos()))
         }
-        inStream->Init(item->Get_PackSize_Aligned());
-        RINOK(copyCoder.Interface()->Code(inStream2, outStreamSpec, NULL, NULL, lps))
+        streamSpec->Init(item->Get_PackSize_Aligned());
+        RINOK(copyCoder->Code(inStream2, outStream, NULL, NULL, progress))
       }
       if (outStreamSpec->GetRem() != 0)
         opRes = NExtract::NOperationResult::kDataError;

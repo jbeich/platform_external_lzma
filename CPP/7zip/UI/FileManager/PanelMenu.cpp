@@ -155,6 +155,16 @@ static void AddPropertyString(PROPID propID, UInt64 val, CListViewDialog &dialog
 }
 
 
+static inline unsigned GetHex_Upper(unsigned v)
+{
+  return (v < 10) ? ('0' + v) : ('A' + (v - 10));
+}
+
+static inline unsigned GetHex_Lower(unsigned v)
+{
+  return (v < 10) ? ('0' + v) : ('a' + (v - 10));
+}
+
 static const Byte kSpecProps[] =
 {
   kpidPath,
@@ -234,7 +244,7 @@ void CPanel::Properties()
               ConvertNtSecureToString((const Byte *)data, dataSize, s);
             else
             {
-              const unsigned kMaxDataSize = 1 << 8;
+              const UInt32 kMaxDataSize = 64;
               if (dataSize > kMaxDataSize)
               {
                 s += "data:";
@@ -242,12 +252,22 @@ void CPanel::Properties()
               }
               else
               {
-                char temp[kMaxDataSize * 2 + 2];
-                if (dataSize <= 8 && (propID == kpidCRC || propID == kpidChecksum))
-                  ConvertDataToHex_Upper(temp, (const Byte *)data, dataSize);
-                else
-                  ConvertDataToHex_Lower(temp, (const Byte *)data, dataSize);
-                s += temp;
+                const bool needUpper = (dataSize <= 8)
+                    && (propID == kpidCRC || propID == kpidChecksum);
+                for (UInt32 k = 0; k < dataSize; k++)
+                {
+                  const Byte b = ((const Byte *)data)[k];
+                  if (needUpper)
+                  {
+                    s += (char)GetHex_Upper((b >> 4) & 0xF);
+                    s += (char)GetHex_Upper(b & 0xF);
+                  }
+                  else
+                  {
+                    s += (char)GetHex_Lower((b >> 4) & 0xF);
+                    s += (char)GetHex_Lower(b & 0xF);
+                  }
+                }
               }
             }
             AddPropertyPair(GetNameOfProperty(propID, name), (UString)s.Ptr(), message);
@@ -602,7 +622,7 @@ HRESULT CPanel::CreateShellContextMenu(
   ODS("==== CPanel::CreateShellContextMenu pidls END");
   // Get IContextMenu for items
   RINOK(parentFolder->GetUIObjectOf(GetParent(),
-      pidls.items.Size(), (LPCITEMIDLIST *)(void *)pidls.items.ConstData(),
+      pidls.items.Size(), (LPCITEMIDLIST *)(void *)&pidls.items.Front(),
       IID_IContextMenu, NULL, (void**)&systemContextMenu))
   ODS("==== CPanel::CreateShellContextMenu GetUIObjectOf finished");
   if (!systemContextMenu)

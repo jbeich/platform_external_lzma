@@ -979,7 +979,7 @@ void CInArchive::GetNsisString_Unicode_Raw(const Byte *p)
         break;
       if (c < 0x80)
       {
-        Raw_UString.Add_Char((char)c);
+        Raw_UString += (char)c;
         continue;
       }
       
@@ -2623,7 +2623,7 @@ void CInArchive::DetectNsisType(const CBlockHeader &bh, const Byte *p)
       
     for (UInt32 kkk = 0; kkk < bh.Num; kkk++, p2 += kCmdSize)
     {
-      const UInt32 cmd = Get32(p2); // we use original (not converted) command
+      UInt32 cmd = Get32(p2); // we use original (not converted) command
 
       if (cmd < EW_WRITEUNINSTALLER ||
           cmd > EW_WRITEUNINSTALLER + numInsertMax)
@@ -2639,7 +2639,7 @@ void CInArchive::DetectNsisType(const CBlockHeader &bh, const Byte *p)
           params[3] <= 1)
         continue;
 
-      const UInt32 altParam = params[3];
+      UInt32 altParam = params[3];
       if (!IsGoodString(params[0]) ||
           !IsGoodString(altParam))
         continue;
@@ -2649,8 +2649,8 @@ void CInArchive::DetectNsisType(const CBlockHeader &bh, const Byte *p)
         continue;
       if (AreTwoParamStringsEqual(altParam + additional, params[0]))
       {
-        const unsigned numInserts = cmd - EW_WRITEUNINSTALLER;
-        mask |= ((unsigned)1 << numInserts);
+        unsigned numInserts = cmd - EW_WRITEUNINSTALLER;
+        mask |= (1 << numInserts);
       }
     }
 
