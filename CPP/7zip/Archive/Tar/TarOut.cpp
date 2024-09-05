@@ -232,7 +232,7 @@ static void AddPaxLine(AString &s, const char *name, const AString &val)
   s += n;
   s.Add_Space();
   s += name;
-  s.Add_Char('=');
+  s += '=';
   s += val;
   s.Add_LF();
 }

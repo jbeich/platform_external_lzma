@@ -507,7 +507,7 @@ static HRESULT Compress(
               if (rp.GetNewPath(false, mainName, dest))
               {
                 needRename = true;
-                dest.Add_Colon();
+                dest += ':';
                 dest += ai.Name.Ptr((unsigned)(colonPos + 1));
                 break;
               }
@@ -704,7 +704,7 @@ static HRESULT Compress(
         }
         else
           realPath = us2fs(archivePath.GetFinalPath());
-        if (outStreamSpec->Create_NEW(realPath))
+        if (outStreamSpec->Create(realPath, false))
         {
           tempFiles.Paths.Add(realPath);
           isOK = true;
@@ -763,7 +763,7 @@ static HRESULT Compress(
       outStreamSpec2 = new COutFileStream;
       sfxOutStream = outStreamSpec2;
       const FString realPath = us2fs(archivePath.GetFinalPath());
-      if (!outStreamSpec2->Create_NEW(realPath))
+      if (!outStreamSpec2->Create(realPath, false))
         return errorInfo.SetFromLastError("cannot open file", realPath);
     }
 
@@ -856,7 +856,7 @@ static HRESULT Compress(
 
   if (!updateCallbackSpec->AreAllFilesClosed())
   {
-    errorInfo.Message = "There are unclosed input files:";
+    errorInfo.Message = "There are unclosed input file:";
     errorInfo.FileNames = updateCallbackSpec->_openFiles_Paths;
     return E_FAIL;
   }
@@ -1331,14 +1331,12 @@ HRESULT UpdateArchive(
   if (options.StdInMode)
   {
     CDirItem di;
-    // di.ClearBase();
-    // di.Size = (UInt64)(Int64)-1;
-    if (!di.SetAs_StdInFile())
-      return GetLastError_noZero_HRESULT();
+    di.ClearBase();
     di.Name = options.StdInFileName;
-    // di.Attrib_IsDefined = false;
-    // NTime::GetCurUtc_FiTime(di.MTime);
-    // di.CTime = di.ATime = di.MTime;
+    di.Size = (UInt64)(Int64)-1;
+    di.SetAsFile();
+    NTime::GetCurUtc_FiTime(di.MTime);
+    di.CTime = di.ATime = di.MTime;
     dirItems.Items.Add(di);
   }
   else
@@ -1628,8 +1626,6 @@ HRESULT UpdateArchive(
 
 
   #if defined(_WIN32) && !defined(UNDER_CE)
-
-Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
   
   if (options.EMailMode)
   {
@@ -1699,7 +1695,7 @@ Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
       Z7_WIN_MapiMessageW m;
       memset(&m, 0, sizeof(m));
       m.nFileCount = files.Size();
-      m.lpFiles = files.NonConstData();
+      m.lpFiles = &files.Front();
       
       const UString addr (options.EMailAddress);
       Z7_WIN_MapiRecipDescW rec;
@@ -1760,7 +1756,7 @@ Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
       MapiMessage m;
       memset(&m, 0, sizeof(m));
       m.nFileCount = files.Size();
-      m.lpFiles = files.NonConstData();
+      m.lpFiles = &files.Front();
       
       const AString addr (GetAnsiString(options.EMailAddress));
       MapiRecipDesc rec;

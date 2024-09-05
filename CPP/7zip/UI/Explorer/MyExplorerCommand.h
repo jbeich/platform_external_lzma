@@ -89,7 +89,7 @@ enum GETPROPERTYSTOREFLAGS
 #define PROPERTYKEY_DEFINED
 
 typedef
-struct
+struct _tagpropertykey
 {
   GUID fmtid;
   DWORD pid;

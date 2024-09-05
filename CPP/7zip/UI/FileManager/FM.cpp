@@ -48,10 +48,6 @@ using namespace NFind;
 // #define MAX_LOADSTRING 100
 
 extern
-bool g_DisableUserQuestions;
-bool g_DisableUserQuestions;
-
-extern
 bool g_RAM_Size_Defined;
 bool g_RAM_Size_Defined;
 
@@ -82,9 +78,8 @@ void FreeGlobalCodecs();
 
 #ifndef UNDER_CE
 
-#ifdef Z7_USE_DYN_ComCtl32Version
-Z7_DIAGNOSTIC_IGNORE_CAST_FUNCTION
-
+extern
+DWORD g_ComCtl32Version;
 DWORD g_ComCtl32Version;
 
 static DWORD GetDllVersion(LPCTSTR dllName)
@@ -111,7 +106,6 @@ static DWORD GetDllVersion(LPCTSTR dllName)
   return dwVersion;
 }
 
-#endif
 #endif
 
 bool g_IsSmallScreen = false;
@@ -208,36 +202,7 @@ static const wchar_t * const kWindowClass = L"7-Zip::FM";
   WS_MAXIMIZEBOX)
 #endif
 
-
-/*
-typedef HRESULT (WINAPI *Func_SetWindowTheme)(
-  HWND    hwnd,
-  LPCWSTR pszSubAppName,
-  LPCWSTR pszSubIdList
-);
-
-typedef BOOL (WINAPI *Func_AllowDarkModeForWindow)(
-  HWND a_HWND, BOOL a_Allow);
-
-enum PreferredAppMode
-{
-  Default,
-  AllowDark,
-  ForceDark,
-  ForceLight,
-  Max
-};
-// ordinal 135, in 1903
-typedef BOOL (WINAPI *Func_SetPreferredAppMode)(PreferredAppMode appMode);
-
-typedef HRESULT (WINAPI *Func_DwmSetWindowAttribute)(
-       HWND    hwnd,
-       DWORD   dwAttribute,
-       LPCVOID pvAttribute,
-       DWORD   cbAttribute
-);
-*/
-
+//  FUNCTION: InitInstance(HANDLE, int)
 static BOOL InitInstance(int nCmdShow)
 {
   CWindow wnd;
@@ -327,69 +292,6 @@ static BOOL InitInstance(int nCmdShow)
   if (!wnd.Create(kWindowClass, title, style,
     x, y, xSize, ySize, NULL, NULL, g_hInstance, NULL))
     return FALSE;
-
-  /*
-  // doesn't work
-  {
-    const HMODULE hmodule = LoadLibrary("UxTheme.dll");
-    if (hmodule)
-    {
-      {
-        const
-          Func_AllowDarkModeForWindow f = Z7_GET_PROC_ADDRESS(
-          Func_AllowDarkModeForWindow, hmodule,
-          MAKEINTRESOURCEA(133));
-        if (f)
-        {
-          BOOL res = f((HWND)wnd, TRUE);
-          res = res;
-        }
-      }
-      {
-        const
-          Func_SetPreferredAppMode f = Z7_GET_PROC_ADDRESS(
-          Func_SetPreferredAppMode, hmodule,
-          MAKEINTRESOURCEA(135));
-        if (f)
-        {
-          f(ForceDark);
-        }
-      }
-      {
-        const
-          Func_SetWindowTheme f = Z7_GET_PROC_ADDRESS(
-          Func_SetWindowTheme, hmodule,
-          "SetWindowTheme");
-        if (f)
-        {
-          // HRESULT hres = f((HWND)wnd, L"DarkMode_Explorer", NULL);
-          HRESULT hres = f((HWND)wnd, L"Explorer", NULL);
-          hres = hres;
-        }
-      }
-      FreeLibrary(hmodule);
-    }
-  }
-  {
-    const HMODULE hmodule = LoadLibrary("Dwmapi.dll");
-    if (hmodule)
-    {
-      const
-        Func_DwmSetWindowAttribute f = Z7_GET_PROC_ADDRESS(
-        Func_DwmSetWindowAttribute, hmodule,
-        "DwmSetWindowAttribute");
-      if (f)
-      {
-        #ifndef Z7_WIN_DWMWA_USE_IMMERSIVE_DARK_MODE
-        #define Z7_WIN_DWMWA_USE_IMMERSIVE_DARK_MODE 20
-        #endif
-        BOOL value = TRUE;
-        f((HWND)wnd, Z7_WIN_DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-      }
-      FreeLibrary(hmodule);
-    }
-  }
-  */
 
   if (nCmdShow == SW_SHOWNORMAL ||
       nCmdShow == SW_SHOW
@@ -617,10 +519,10 @@ static int WINAPI WinMain2(int nCmdShow)
 
   InitCommonControls();
 
-#ifdef Z7_USE_DYN_ComCtl32Version
+  #ifndef UNDER_CE
   g_ComCtl32Version = ::GetDllVersion(TEXT("comctl32.dll"));
   g_LVN_ITEMACTIVATE_Support = (g_ComCtl32Version >= MAKELONG(71, 4));
-#endif
+  #endif
 
   #if defined(_WIN32) && !defined(_WIN64) && !defined(UNDER_CE)
   Set_Wow64();

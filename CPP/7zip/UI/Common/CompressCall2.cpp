@@ -68,7 +68,7 @@ UString GetQuotedString(const UString &s)
 {
   UString s2 ('\"');
   s2 += s;
-  s2.Add_Char('\"');
+  s2 += '\"';
   return s2;
 }
 

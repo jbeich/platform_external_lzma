@@ -7,8 +7,7 @@ CFLAGS = $(CFLAGS) \
 LIBS = $(LIBS) Commctrl.lib
 !ELSE
 LIBS = $(LIBS) htmlhelp.lib comdlg32.lib Mpr.lib Gdi32.lib
-# CFLAGS = $(CFLAGS) -DZ7_LONG_PATH
-# -DZ7_NO_LARGE_PAGES
+CFLAGS = $(CFLAGS) -DZ7_LONG_PATH
 !ENDIF
 
 EXPLORER_OBJS = \
@@ -42,7 +41,6 @@ WIN_OBJS = \
   $O\ResourceString.obj \
   $O\Shell.obj \
   $O\Synchronization.obj \
-  $O\TimeUtils.obj \
   $O\Window.obj \
 
 !IFDEF UNDER_CE

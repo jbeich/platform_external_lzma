@@ -302,13 +302,13 @@ int FindAltStreamColon(CFSTR path) throw()
 static unsigned GetRootPrefixSize_Of_NetworkPath(CFSTR s)
 {
   // Network path: we look "server\path\" as root prefix
-  const int pos = FindSepar(s);
+  int pos = FindSepar(s);
   if (pos < 0)
     return 0;
-  const int pos2 = FindSepar(s + (unsigned)pos + 1);
+  int pos2 = FindSepar(s + (unsigned)pos + 1);
   if (pos2 < 0)
     return 0;
-  return (unsigned)pos + (unsigned)pos2 + 2;
+  return pos + pos2 + 2;
 }
 
 static unsigned GetRootPrefixSize_Of_SimplePath(CFSTR s)
@@ -334,7 +334,7 @@ static unsigned GetRootPrefixSize_Of_SuperPath(CFSTR s)
   const int pos = FindSepar(s + kSuperPathPrefixSize);
   if (pos < 0)
     return 0;
-  return kSuperPathPrefixSize + (unsigned)pos + 1;
+  return kSuperPathPrefixSize + pos + 1;
 }
 
 unsigned GetRootPrefixSize(CFSTR s) throw()

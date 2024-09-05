@@ -58,8 +58,7 @@ void CKeyInfo::CalcKey()
 
     // MY_ALIGN (16)
     // CSha256 sha;
-    const size_t shaAllocSize = sizeof(CSha256) + unrollSize + bufSize * 2;
-    CAlignedBuffer1 sha(shaAllocSize);
+    CAlignedBuffer sha(sizeof(CSha256) + unrollSize + bufSize * 2);
     Byte *buf = sha + sizeof(CSha256);
 
     memcpy(buf, Salt, SaltSize);
@@ -109,7 +108,7 @@ void CKeyInfo::CalcKey()
     */
 
     Sha256_Final((CSha256 *)(void *)(Byte *)sha, Key);
-    memset(sha, 0, shaAllocSize);
+    memset(sha, 0, sha.Size());
   }
 }
 
@@ -256,16 +255,19 @@ Z7_COM7F_IMF(CDecoder::SetDecoderProperties2(const Byte *data, UInt32 size))
   if (size == 0)
     return S_OK;
   
-  const unsigned b0 = data[0];
+  Byte b0 = data[0];
+
   _key.NumCyclesPower = b0 & 0x3F;
   if ((b0 & 0xC0) == 0)
     return size == 1 ? S_OK : E_INVALIDARG;
+
   if (size <= 1)
     return E_INVALIDARG;
 
-  const unsigned b1 = data[1];
-  const unsigned saltSize = ((b0 >> 7) & 1) + (b1 >> 4);
-  const unsigned ivSize   = ((b0 >> 6) & 1) + (b1 & 0x0F);
+  Byte b1 = data[1];
+
+  unsigned saltSize = ((b0 >> 7) & 1) + (b1 >> 4);
+  unsigned ivSize   = ((b0 >> 6) & 1) + (b1 & 0x0F);
   
   if (size != 2 + saltSize + ivSize)
     return E_INVALIDARG;

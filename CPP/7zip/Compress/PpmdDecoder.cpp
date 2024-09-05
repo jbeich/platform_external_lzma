@@ -74,7 +74,6 @@ HRESULT CDecoder::CodeSpec(Byte *memStream, UInt32 size)
       _status = kStatus_Normal;
       Ppmd7_Init(&_ppmd, _order);
       break;
-    default: break;
   }
   
   if (_outSizeDefined)

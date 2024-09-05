@@ -16,14 +16,12 @@ IS_MINGW = 1
 endif
 endif
 
-LOCAL_FLAGS_SYS =
 
 ifdef IS_MINGW
 
-LOCAL_FLAGS_SYS = \
+LOCAL_FLAGS_WIN = \
+  -DZ7_LARGE_PAGES \
   $(LOCAL_FLAGS_ST) \
-
-#  -DZ7_LARGE_PAGES \
 
 SYS_OBJS = \
   $O/resource.o \
@@ -37,7 +35,7 @@ endif
 
 LOCAL_FLAGS = \
   -DZ7_EXTERNAL_CODECS \
-  $(LOCAL_FLAGS_SYS) \
+  $(LOCAL_FLAGS_WIN) \
   $(LOCAL_FLAGS_ST) \
 
 

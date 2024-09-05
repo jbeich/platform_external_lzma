@@ -27,7 +27,6 @@
 #include "../../../Windows/ErrorMsg.h"
 #include "../../../Windows/FileDir.h"
 #include "../../../Windows/FileName.h"
-#include "../../../Windows/PropVariantConv.h"
 #include "../../../Windows/System.h"
 #ifdef _WIN32
 #include "../../../Windows/FileMapping.h"
@@ -136,7 +135,6 @@ enum Enum
   kHash,
   // kHashGenFile,
   kHashDir,
-  kExtractMemLimit,
  
   kStdIn,
   kStdOut,
@@ -146,8 +144,6 @@ enum Enum
   kConsoleCharSet,
   kTechMode,
   kListFields,
-  kListPathSlash,
-  kListTimestampUTC,
   
   kPreserveATime,
   kShareForWrite,
@@ -287,7 +283,6 @@ static const CSwitchForm kSwitchForms[] =
   { "scrc", SWFRM_STRING_MULT(0) },
   // { "scrf", SWFRM_STRING_SINGL(1) },
   { "shd", SWFRM_STRING_SINGL(1) },
-  { "smemx", SWFRM_STRING },
   
   { "si", SWFRM_STRING },
   { "so", SWFRM_SIMPLE },
@@ -297,8 +292,6 @@ static const CSwitchForm kSwitchForms[] =
   { "scc", SWFRM_STRING },
   { "slt", SWFRM_SIMPLE },
   { "slf", SWFRM_STRING_SINGL(1) },
-  { "slsl", SWFRM_MINUS },
-  { "slmu", SWFRM_MINUS },
 
   { "ssp", SWFRM_SIMPLE },
   { "ssw", SWFRM_SIMPLE },
@@ -464,7 +457,6 @@ static void AddNameToCensor(NWildcard::CCensor &censor,
   censor.AddPreItem(nop.Include, name, props);
 }
 
-#ifndef Z7_EXTRACT_ONLY
 static void AddRenamePair(CObjectVector<CRenamePair> *renamePairs,
     const UString &oldName, const UString &newName, NRecursedType::EEnum type,
     bool wildcardMatching)
@@ -489,7 +481,6 @@ static void AddRenamePair(CObjectVector<CRenamePair> *renamePairs,
     throw CArcCmdLineException("Unsupported rename command:", val);
   }
 }
-#endif
 
 static void AddToCensorFromListFile(
     CObjectVector<CRenamePair> *renamePairs,
@@ -516,7 +507,6 @@ static void AddToCensorFromListFile(
   }
   if (renamePairs)
   {
-    #ifndef Z7_EXTRACT_ONLY
     if ((names.Size() & 1) != 0)
       throw CArcCmdLineException(kIncorrectListFile, fileName);
     for (unsigned i = 0; i < names.Size(); i += 2)
@@ -524,9 +514,6 @@ static void AddToCensorFromListFile(
       // change type !!!!
       AddRenamePair(renamePairs, names[i], names[i + 1], nop.RecursedType, nop.WildcardMatching);
     }
-    #else
-    throw "not implemented";
-    #endif
   }
   else
     FOR_VECTOR (i, names)
@@ -575,7 +562,6 @@ static void AddToCensorFromNonSwitchesStrings(
       AddToCensorFromListFile(renamePairs, censor, nop, s.Ptr(1), codePage);
     else if (renamePairs)
     {
-      #ifndef Z7_EXTRACT_ONLY
       if (oldIndex == -1)
         oldIndex = (int)i;
       else
@@ -585,9 +571,6 @@ static void AddToCensorFromNonSwitchesStrings(
         // AddRenamePair(renamePairs, nonSwitchStrings[oldIndex], s, type);
         oldIndex = -1;
       }
-      #else
-      throw "not implemented";
-      #endif
     }
     else
       AddNameToCensor(censor, nop, s);
@@ -622,10 +605,10 @@ static const char *ParseMapWithPaths(
     const CNameOption &nop)
 {
   UString s (s2);
-  const int pos = s.Find(L':');
+  int pos = s.Find(L':');
   if (pos < 0)
     return k_IncorrectMapCommand;
-  const int pos2 = s.Find(L':', (unsigned)(pos + 1));
+  int pos2 = s.Find(L':', (unsigned)(pos + 1));
   if (pos2 < 0)
     return k_IncorrectMapCommand;
 
@@ -642,7 +625,7 @@ static const char *ParseMapWithPaths(
   CFileMapping map;
   if (map.Open(FILE_MAP_READ, GetSystemString(s)) != 0)
     return "Cannot open mapping";
-  const LPVOID data = map.Map(FILE_MAP_READ, 0, size);
+  LPVOID data = map.Map(FILE_MAP_READ, 0, size);
   if (!data)
     return "MapViewOfFile error";
   CFileUnmapper unmapper(data);
@@ -651,10 +634,10 @@ static const char *ParseMapWithPaths(
   const wchar_t *p = (const wchar_t *)data;
   if (*p != 0) // data format marker
     return "Unsupported Map data";
-  const UInt32 numChars = size / sizeof(wchar_t);
+  UInt32 numChars = size / sizeof(wchar_t);
   for (UInt32 i = 1; i < numChars; i++)
   {
-    const wchar_t c = p[i];
+    wchar_t c = p[i];
     if (c == 0)
     {
       // MessageBoxW(0, name, L"7-Zip", 0);
@@ -1019,7 +1002,6 @@ void CArcCmdLineParser::Parse1(const UStringVector &commandStrings,
   options.IsStdErrTerminal = MY_IS_TERMINAL(stderr);
 
   options.HelpMode = parser[NKey::kHelp1].ThereIs || parser[NKey::kHelp2].ThereIs  || parser[NKey::kHelp3].ThereIs;
-  options.YesToAll = parser[NKey::kYes].ThereIs;
 
   options.StdInMode = parser[NKey::kStdIn].ThereIs;
   options.StdOutMode = parser[NKey::kStdOut].ThereIs;
@@ -1029,13 +1011,6 @@ void CArcCmdLineParser::Parse1(const UStringVector &commandStrings,
     const UString &s = parser[NKey::kListFields].PostStrings[0];
     options.ListFields = GetAnsiString(s);
   }
-  if (parser[NKey::kListPathSlash].ThereIs)
-  {
-    options.ListPathSeparatorSlash.Val = !parser[NKey::kListPathSlash].WithMinus;
-    options.ListPathSeparatorSlash.Def = true;
-  }
-  if (parser[NKey::kListTimestampUTC].ThereIs)
-    g_Timestamp_Show_UTC = !parser[NKey::kListTimestampUTC].WithMinus;
   options.TechMode = parser[NKey::kTechMode].ThereIs;
   options.ShowTime = parser[NKey::kShowTime].ThereIs;
 
@@ -1115,7 +1090,7 @@ void CArcCmdLineParser::Parse1(const UStringVector &commandStrings,
   }
 
 
-#ifndef UNDER_CE
+  #ifndef UNDER_CE
 
   if (parser[NKey::kAffinity].ThereIs)
   {
@@ -1126,9 +1101,7 @@ void CArcCmdLineParser::Parse1(const UStringVector &commandStrings,
       a.SetFromWStr_if_Ascii(s);
       Parse1Log += "Set process affinity mask: ";
 
-      bool isError = false;
-
-#ifdef _WIN32
+      #ifdef _WIN32
 
       UInt64 v = 0;
       {
@@ -1138,62 +1111,61 @@ void CArcCmdLineParser::Parse1(const UStringVector &commandStrings,
           a.Empty();
       }
       if (a.IsEmpty())
-        isError = true;
-      else
+        throw CArcCmdLineException("Unsupported switch postfix -stm", s);
+
       {
-#ifndef _WIN64
+        #ifndef _WIN64
         if (v >= ((UInt64)1 << 32))
           throw CArcCmdLineException("unsupported value -stm", s);
-        else
-#endif
+        #endif
         {
           PrintHex(Parse1Log, v);
           if (!SetProcessAffinityMask(GetCurrentProcess(), (DWORD_PTR)v))
           {
-            const DWORD lastError = GetLastError();
+            DWORD lastError = GetLastError();
             Parse1Log += " : ERROR : ";
             Parse1Log += NError::MyFormatMessage(lastError);
           }
         }
       }
       
-#else // _WIN32
+      #else // _WIN32
       
-      if (a.Len() != s.Len())
-        isError = true;
-      else
       {
         Parse1Log += a;
         NSystem::CProcessAffinity aff;
         aff.CpuZero();
-        unsigned cpu = 0;
-        unsigned i = a.Len();
-        while (i)
+        for (unsigned i = 0; i < a.Len(); i++)
         {
-          unsigned v = (Byte)a[--i];
-          Z7_PARSE_HEX_DIGIT(v, { isError = true; break; })
-          for (unsigned mask = 1; mask != 1u << 4; mask <<= 1, cpu++)
-            if (v & mask)
+          char c = a[i];
+          unsigned v;
+               if (c >= '0' && c <= '9') v =      (unsigned)(c - '0');
+          else if (c >= 'A' && c <= 'F') v = 10 + (unsigned)(c - 'A');
+          else if (c >= 'a' && c <= 'f') v = 10 + (unsigned)(c - 'a');
+          else
+            throw CArcCmdLineException("Unsupported switch postfix -stm", s);
+          for (unsigned k = 0; k < 4; k++)
+          {
+            const unsigned cpu = (a.Len() - 1 - i) * 4 + k;
+            if (v & ((unsigned)1 << k))
               aff.CpuSet(cpu);
+          }
         }
-        if (!isError)
+        
         if (!aff.SetProcAffinity())
         {
-          const DWORD lastError = GetLastError();
+          DWORD lastError = GetLastError();
           Parse1Log += " : ERROR : ";
           Parse1Log += NError::MyFormatMessage(lastError);
         }
       }
-#endif // _WIN32
-
-      if (isError)
-        throw CArcCmdLineException("Unsupported switch postfix -stm", s);
+      #endif // _WIN32
 
       Parse1Log.Add_LF();
     }
   }
 
-#endif
+  #endif
 }
 
 
@@ -1246,40 +1218,6 @@ static void SetBoolPair(NCommandLineParser::CParser &parser, unsigned switchID, 
     bp.Val = !parser[switchID].WithMinus;
 }
 
-
-static bool ParseSizeString(const wchar_t *s, UInt64 &res)
-{
-  const wchar_t *end;
-  const UInt64 v = ConvertStringToUInt64(s, &end);
-  if (s == end)
-    return false;
-  const wchar_t c = *end;
-
-  if (c == 0)
-  {
-    res = v;
-    return true;
-  }
-  if (end[1] != 0)
-    return false;
-
-  unsigned numBits;
-  switch (MyCharLower_Ascii(c))
-  {
-    case 'b': numBits =  0; break;
-    case 'k': numBits = 10; break;
-    case 'm': numBits = 20; break;
-    case 'g': numBits = 30; break;
-    case 't': numBits = 40; break;
-    default: return false;
-  }
-  const UInt64 val2 = v << numBits;
-  if ((val2 >> numBits) != v)
-    return false;
-  res = val2;
-  return true;
-}
-
 void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
 {
   const UStringVector &nonSwitchStrings = parser.NonSwitchStrings;
@@ -1313,13 +1251,6 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
 
   if (parser[NKey::kHashDir].ThereIs)
     options.ExtractOptions.HashDir = parser[NKey::kHashDir].PostStrings[0];
-  
-  if (parser[NKey::kExtractMemLimit].ThereIs)
-  {
-    const UString &s = parser[NKey::kExtractMemLimit].PostStrings[0];
-    if (!ParseSizeString(s, options.ExtractOptions.NtOptions.MemLimit))
-      throw CArcCmdLineException("Unsupported -smemx:", s);
-  }
   
   if (parser[NKey::kElimDup].ThereIs)
   {
@@ -1369,7 +1300,7 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
 
   options.ConsoleCodePage = FindCharset(parser, NKey::kConsoleCharSet, true, -1);
 
-  const UInt32 codePage = (UInt32)FindCharset(parser, NKey::kListfileCharSet, false, CP_UTF8);
+  UInt32 codePage = (UInt32)FindCharset(parser, NKey::kListfileCharSet, false, CP_UTF8);
 
   bool thereAreSwitchIncludes = false;
 
@@ -1422,6 +1353,9 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
       nonSwitchStrings, parser.StopSwitchIndex,
       nop,
       thereAreSwitchIncludes, codePage);
+
+  options.YesToAll = parser[NKey::kYes].ThereIs;
+
 
   #ifndef Z7_NO_CRYPTO
   options.PasswordEnabled = parser[NKey::kPassword].ThereIs;

@@ -77,9 +77,7 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       if (_needMoreInput) v |= kpv_ErrorFlags_UnexpectedEnd;
       if (_dataAfterEnd) v |= kpv_ErrorFlags_DataAfterEnd;
       prop = v;
-      break;
     }
-    default: break;
   }
   prop.Detach(value);
   return S_OK;
@@ -98,7 +96,6 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 /* index */, PROPID propID, PROPVARIAN
   {
     case kpidPackSize: if (_packSize_Defined) prop = _packSize; break;
     case kpidSize: if (_unpackSize_Defined) prop = _unpackSize; break;
-    default: break;
   }
   prop.Detach(value);
   return S_OK;
@@ -178,12 +175,8 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     return E_INVALIDARG;
 
   if (_packSize_Defined)
-  {
-    RINOK(extractCallback->SetTotal(_packSize))
-  }
+    extractCallback->SetTotal(_packSize);
 
-  Int32 opRes;
- {
   CMyComPtr<ISequentialOutStream> realOutStream;
   const Int32 askMode = testMode ?
       NExtract::NAskMode::kTest :
@@ -192,7 +185,7 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   if (!testMode && !realOutStream)
     return S_OK;
 
-  RINOK(extractCallback->PrepareOperation(askMode))
+  extractCallback->PrepareOperation(askMode);
 
   if (_needSeekToStart)
   {
@@ -205,85 +198,90 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
 
   // try {
 
-  CMyComPtr2_Create<ICompressCoder, NCompress::NBZip2::CDecoder> decoder;
+  NCompress::NBZip2::CDecoder *decoderSpec = new NCompress::NBZip2::CDecoder;
+  CMyComPtr<ICompressCoder> decoder = decoderSpec;
 
   #ifndef Z7_ST
-  RINOK(decoder->SetNumberOfThreads(_props._numThreads))
+  RINOK(decoderSpec->SetNumberOfThreads(_props._numThreads))
   #endif
 
-  CMyComPtr2_Create<ISequentialOutStream, CDummyOutStream> outStream;
-  outStream->SetStream(realOutStream);
-  outStream->Init();
-  // realOutStream.Release();
+  CDummyOutStream *outStreamSpec = new CDummyOutStream;
+  CMyComPtr<ISequentialOutStream> outStream(outStreamSpec);
+  outStreamSpec->SetStream(realOutStream);
+  outStreamSpec->Init();
+  
+  realOutStream.Release();
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, true);
 
-  decoder->FinishMode = true;
-  decoder->Base.DecodeAllStreams = true;
+  decoderSpec->FinishMode = true;
+  decoderSpec->Base.DecodeAllStreams = true;
   
   _dataAfterEnd = false;
   _needMoreInput = false;
 
-  HRESULT result = decoder.Interface()->Code(_seqStream, outStream, NULL, NULL, lps);
+  lps->InSize = 0;
+  lps->OutSize = 0;
+  
+  HRESULT result = decoder->Code(_seqStream, outStream, NULL, NULL, progress);
   
   if (result != S_FALSE && result != S_OK)
     return result;
   
-  if (decoder->Base.NumStreams == 0)
+  if (decoderSpec->Base.NumStreams == 0)
   {
     _isArc = false;
     result = S_FALSE;
   }
   else
   {
-    const UInt64 inProcessedSize = decoder->GetInputProcessedSize();
+    const UInt64 inProcessedSize = decoderSpec->GetInputProcessedSize();
     UInt64 packSize = inProcessedSize;
 
-    if (decoder->Base.NeedMoreInput)
+    if (decoderSpec->Base.NeedMoreInput)
       _needMoreInput = true;
     
-    if (!decoder->Base.IsBz)
+    if (!decoderSpec->Base.IsBz)
     {
-      packSize = decoder->Base.FinishedPackSize;
+      packSize = decoderSpec->Base.FinishedPackSize;
       if (packSize != inProcessedSize)
         _dataAfterEnd = true;
     }
 
     _packSize = packSize;
-    _unpackSize = decoder->GetOutProcessedSize();
-    _numStreams = decoder->Base.NumStreams;
-    _numBlocks = decoder->GetNumBlocks();
+    _unpackSize = decoderSpec->GetOutProcessedSize();
+    _numStreams = decoderSpec->Base.NumStreams;
+    _numBlocks = decoderSpec->GetNumBlocks();
 
     _packSize_Defined = true;
     _unpackSize_Defined = true;
     _numStreams_Defined = true;
     _numBlocks_Defined = true;
-
-    // RINOK(
-    lps.Interface()->SetRatioInfo(&packSize, &_unpackSize);
   }
   
-  // outStream.Release();
+  outStream.Release();
+
+  Int32 opRes;
 
   if (!_isArc)
     opRes = NExtract::NOperationResult::kIsNotArc;
   else if (_needMoreInput)
     opRes = NExtract::NOperationResult::kUnexpectedEnd;
-  else if (decoder->GetCrcError())
+  else if (decoderSpec->GetCrcError())
     opRes = NExtract::NOperationResult::kCRCError;
   else if (_dataAfterEnd)
     opRes = NExtract::NOperationResult::kDataAfterEnd;
   else if (result == S_FALSE)
     opRes = NExtract::NOperationResult::kDataError;
-  else if (decoder->Base.MinorError)
+  else if (decoderSpec->Base.MinorError)
     opRes = NExtract::NOperationResult::kDataError;
   else if (result == S_OK)
     opRes = NExtract::NOperationResult::kOK;
   else
     return result;
 
- }
   return extractCallback->SetOperationResult(opRes);
 
   // } catch(...)  { return E_FAIL; }
@@ -354,13 +352,14 @@ static HRESULT UpdateArchive(
       }
     }
     RINOK(updateCallback->SetTotal(unpackSize))
-
-    CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
-    lps->Init(updateCallback, true);
+    CLocalProgress *localProgressSpec = new CLocalProgress;
+    CMyComPtr<ICompressProgressInfo> localProgress = localProgressSpec;
+    localProgressSpec->Init(updateCallback, true);
     {
-      CMyComPtr2_Create<ICompressCoder, NCompress::NBZip2::CEncoder> encoder;
-      RINOK(props.SetCoderProps(encoder.ClsPtr(), NULL))
-      RINOK(encoder.Interface()->Code(fileInStream, outStream, NULL, NULL, lps))
+      NCompress::NBZip2::CEncoder *encoderSpec = new NCompress::NBZip2::CEncoder;
+      CMyComPtr<ICompressCoder> encoder = encoderSpec;
+      RINOK(props.SetCoderProps(encoderSpec, NULL))
+      RINOK(encoder->Code(fileInStream, outStream, NULL, NULL, localProgress))
       /*
       if (reportArcProp)
       {
@@ -437,7 +436,8 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outStream, UInt32 numIt
   if (indexInArchive != 0)
     return E_INVALIDARG;
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(updateCallback, true);
 
   Z7_DECL_CMyComPtr_QI_FROM(
@@ -453,7 +453,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outStream, UInt32 numIt
   if (_stream)
     RINOK(InStream_SeekToBegin(_stream))
 
-  return NCompress::CopyStream(_stream, outStream, lps);
+  return NCompress::CopyStream(_stream, outStream, progress);
 
   // return ReportArcProps(reportArcProp, NULL, NULL);
 

@@ -43,11 +43,9 @@ static const Byte kNoLiteralStatPrice = 11;
 static const Byte kNoLenStatPrice = 11;
 static const Byte kNoPosStatPrice = 6;
 
-MY_ALIGN(64)
 static Byte g_LenSlots[kNumLenSymbolsMax];
 
 #define kNumLogBits 9    // do not change it
-MY_ALIGN(64)
 static Byte g_FastPos[1 << kNumLogBits];
 
 class CFastPosInit
@@ -59,7 +57,7 @@ public:
     for (i = 0; i < kNumLenSlots; i++)
     {
       unsigned c = kLenStart32[i];
-      const unsigned j = 1u << kLenDirectBits32[i];
+      unsigned j = 1 << kLenDirectBits32[i];
       for (unsigned k = 0; k < j; k++, c++)
         g_LenSlots[c] = (Byte)i;
     }
@@ -68,8 +66,8 @@ public:
     unsigned c = 0;
     for (Byte slotFast = 0; slotFast < kFastSlots; slotFast++)
     {
-      const unsigned k = 1u << kDistDirectBits[slotFast];
-      for (unsigned j = 0; j < k; j++, c++)
+      UInt32 k = (1 << kDistDirectBits[slotFast]);
+      for (UInt32 j = 0; j < k; j++, c++)
         g_FastPos[c] = slotFast;
     }
   }
