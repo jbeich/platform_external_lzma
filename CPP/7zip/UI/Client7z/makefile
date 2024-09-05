@@ -8,9 +8,9 @@ COMMON_OBJS = \
   $O\IntToString.obj \
   $O\NewHandler.obj \
   $O\MyString.obj \
-  $O\MyVector.obj \
   $O\StringConvert.obj \
   $O\StringToInt.obj \
+  $O\MyVector.obj \
   $O\Wildcard.obj \
 
 WIN_OBJS = \
@@ -21,7 +21,6 @@ WIN_OBJS = \
   $O\FileName.obj \
   $O\PropVariant.obj \
   $O\PropVariantConv.obj \
-  $O\TimeUtils.obj \
 
 7ZIP_COMMON_OBJS = \
   $O\FileStreams.obj \

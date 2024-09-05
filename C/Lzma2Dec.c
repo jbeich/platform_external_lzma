@@ -1,5 +1,5 @@
 /* Lzma2Dec.c -- LZMA2 Decoder
-2024-03-01 : Igor Pavlov : Public domain */
+2019-02-02 : Igor Pavlov : Public domain */
 
 /* #define SHOW_DEBUG_INFO */
 
@@ -71,14 +71,14 @@ static SRes Lzma2Dec_GetOldProps(Byte prop, Byte *props)
 SRes Lzma2Dec_AllocateProbs(CLzma2Dec *p, Byte prop, ISzAllocPtr alloc)
 {
   Byte props[LZMA_PROPS_SIZE];
-  RINOK(Lzma2Dec_GetOldProps(prop, props))
+  RINOK(Lzma2Dec_GetOldProps(prop, props));
   return LzmaDec_AllocateProbs(&p->decoder, props, LZMA_PROPS_SIZE, alloc);
 }
 
 SRes Lzma2Dec_Allocate(CLzma2Dec *p, Byte prop, ISzAllocPtr alloc)
 {
   Byte props[LZMA_PROPS_SIZE];
-  RINOK(Lzma2Dec_GetOldProps(prop, props))
+  RINOK(Lzma2Dec_GetOldProps(prop, props));
   return LzmaDec_Allocate(&p->decoder, props, LZMA_PROPS_SIZE, alloc);
 }
 
@@ -93,8 +93,7 @@ void Lzma2Dec_Init(CLzma2Dec *p)
   LzmaDec_Init(&p->decoder);
 }
 
-// ELzma2State
-static unsigned Lzma2Dec_UpdateState(CLzma2Dec *p, Byte b)
+static ELzma2State Lzma2Dec_UpdateState(CLzma2Dec *p, Byte b)
 {
   switch (p->state)
   {
@@ -157,10 +156,8 @@ static unsigned Lzma2Dec_UpdateState(CLzma2Dec *p, Byte b)
       p->decoder.prop.lp = (Byte)lp;
       return LZMA2_STATE_DATA;
     }
-    
-    default:
-      return LZMA2_STATE_ERROR;
   }
+  return LZMA2_STATE_ERROR;
 }
 
 static void LzmaDec_UpdateWithUncompressed(CLzmaDec *p, const Byte *src, SizeT size)
@@ -476,8 +473,8 @@ SRes Lzma2Decode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
   SizeT outSize = *destLen, inSize = *srcLen;
   *destLen = *srcLen = 0;
   *status = LZMA_STATUS_NOT_SPECIFIED;
-  Lzma2Dec_CONSTRUCT(&p)
-  RINOK(Lzma2Dec_AllocateProbs(&p, prop, alloc))
+  Lzma2Dec_Construct(&p);
+  RINOK(Lzma2Dec_AllocateProbs(&p, prop, alloc));
   p.decoder.dic = dest;
   p.decoder.dicBufSize = outSize;
   Lzma2Dec_Init(&p);
@@ -489,5 +486,3 @@ SRes Lzma2Decode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
   Lzma2Dec_FreeProbs(&p, alloc);
   return res;
 }
-
-#undef PRF
