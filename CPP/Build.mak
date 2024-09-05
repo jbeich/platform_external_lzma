@@ -4,11 +4,6 @@ LIBS = $(LIBS) oleaut32.lib ole32.lib
 CFLAGS = $(CFLAGS) -DUNICODE -D_UNICODE
 !ENDIF
 
-!IF "$(CC)" != "clang-cl"
-# for link time code generation:
-# CFLAGS = $(CFLAGS) -GL
-!ENDIF
-
 !IFNDEF O
 !IFDEF PLATFORM
 O=$(PLATFORM)
@@ -17,22 +12,16 @@ O=o
 !ENDIF
 !ENDIF
 
-!IF "$(CC)" != "clang-cl"
 # CFLAGS = $(CFLAGS) -FAsc -Fa$O/asm/
-!ENDIF
 
 
 !IF "$(PLATFORM)" == "x64"
-MY_ML = ml64 -WX
-#-Dx64
+MY_ML = ml64 -Dx64 -WX
 !ELSEIF "$(PLATFORM)" == "arm"
 MY_ML = armasm -WX
 !ELSE
 MY_ML = ml -WX
-# -DABI_CDECL
 !ENDIF
-
-# MY_ML = "$(MY_ML) -Fl$O\asm\
 
 
 !IFDEF UNDER_CE
@@ -56,24 +45,7 @@ COMPL_ASM = $(MY_ML) $** $O/$(*B).obj
 COMPL_ASM = $(MY_ML) -c -Fo$O/ $**
 !ENDIF
 
-!IFDEF OLD_COMPILER
-CFLAGS_WARN_LEVEL = -W4
-!ELSE
-CFLAGS_WARN_LEVEL = -Wall
-!ENDIF
-
-CFLAGS = $(CFLAGS) -nologo -c -Fo$O/ $(CFLAGS_WARN_LEVEL) -WX -EHsc -Gy -GR- -GF
-
-!IF "$(CC)" == "clang-cl"
-
-CFLAGS = $(CFLAGS) \
-  -Werror \
-  -Wall \
-  -Wextra \
-  -Weverything \
-  -Wfatal-errors \
-
-!ENDIF
+CFLAGS = $(CFLAGS) -nologo -c -Fo$O/ -W4 -WX -EHsc -Gy -GR- -GF
 
 !IFDEF MY_DYNAMIC_LINK
 CFLAGS = $(CFLAGS) -MD
@@ -83,35 +55,17 @@ CFLAGS = $(CFLAGS) -MT
 !ENDIF
 !ENDIF
 
-
-CFLAGS = $(CFLAGS_COMMON) $(CFLAGS)
-
-
 !IFNDEF OLD_COMPILER
-
-CFLAGS = $(CFLAGS) -GS- -Zc:wchar_t
-!IFDEF VCTOOLSVERSION
-!IF "$(VCTOOLSVERSION)" >= "14.00"
-!IF "$(CC)" != "clang-cl"
-CFLAGS = $(CFLAGS) -Zc:throwingNew
-!ENDIF
-!ENDIF
-!ELSE
-# -Zc:forScope is default in VS2010. so we need it only for older versions
-CFLAGS = $(CFLAGS) -Zc:forScope
-!ENDIF
-
+CFLAGS = $(CFLAGS) -GS- -Zc:forScope -Zc:wchar_t
 !IFNDEF UNDER_CE
-!IF "$(CC)" != "clang-cl"
-CFLAGS = $(CFLAGS) -MP4
-!ENDIF
+CFLAGS = $(CFLAGS) -MP2
 !IFNDEF PLATFORM
 # CFLAGS = $(CFLAGS) -arch:IA32
 !ENDIF
 !ENDIF
-
+!ELSE
+CFLAGS = $(CFLAGS)
 !ENDIF
-
 
 !IFDEF MY_CONSOLE
 CFLAGS = $(CFLAGS) -D_CONSOLE
@@ -130,7 +84,7 @@ CFLAGS_O1 = $(CFLAGS) -O1
 !ENDIF
 CFLAGS_O2 = $(CFLAGS) -O2
 
-LFLAGS = $(LFLAGS) -nologo -OPT:REF -OPT:ICF -INCREMENTAL:NO
+LFLAGS = $(LFLAGS) -nologo -OPT:REF -OPT:ICF
 
 !IFNDEF UNDER_CE
 LFLAGS = $(LFLAGS) /LARGEADDRESSAWARE
@@ -146,12 +100,6 @@ LFLAGS = $(LFLAGS) /FIXED:NO
 !ENDIF
 # /BASE:0x400000
 !ENDIF
-
-!IF "$(PLATFORM)" == "arm64"
-# we can get better compression ratio with ARM64 filter if we change alignment to 4096
-# LFLAGS = $(LFLAGS) /FILEALIGN:4096
-!ENDIF
-
 
 
 # !IF "$(PLATFORM)" == "x64"
@@ -175,24 +123,17 @@ COMPL_O1   = $(CC) $(CFLAGS_O1) $**
 COMPL_O2   = $(CC) $(CFLAGS_O2) $**
 COMPL_PCH  = $(CC) $(CFLAGS_O1) -Yc"StdAfx.h" -Fp$O/a.pch $**
 COMPL      = $(CC) $(CFLAGS_O1) -Yu"StdAfx.h" -Fp$O/a.pch $**
-COMPLB     = $(CC) $(CFLAGS_O1) -Yu"StdAfx.h" -Fp$O/a.pch $<
-COMPLB_O2  = $(CC) $(CFLAGS_O2) $<
-# COMPLB_O2  = $(CC) $(CFLAGS_O2) -Yu"StdAfx.h" -Fp$O/a.pch $<
+
+COMPLB    = $(CC) $(CFLAGS_O1) -Yu"StdAfx.h" -Fp$O/a.pch $<
+# COMPLB_O2 = $(CC) $(CFLAGS_O2) -Yu"StdAfx.h" -Fp$O/a.pch $<
+COMPLB_O2 = $(CC) $(CFLAGS_O2) $<
 
 CFLAGS_C_ALL = $(CFLAGS_O2) $(CFLAGS_C_SPEC)
-
 CCOMPL_PCH  = $(CC) $(CFLAGS_C_ALL) -Yc"Precomp.h" -Fp$O/a.pch $**
 CCOMPL_USE  = $(CC) $(CFLAGS_C_ALL) -Yu"Precomp.h" -Fp$O/a.pch $**
-CCOMPLB_USE = $(CC) $(CFLAGS_C_ALL) -Yu"Precomp.h" -Fp$O/a.pch $<
 CCOMPL      = $(CC) $(CFLAGS_C_ALL) $**
 CCOMPLB     = $(CC) $(CFLAGS_C_ALL) $<
 
-!IF "$(CC)" == "clang-cl"
-COMPL  = $(COMPL) -FI StdAfx.h
-COMPLB = $(COMPLB) -FI StdAfx.h
-CCOMPL_USE  = $(CCOMPL_USE) -FI Precomp.h
-CCOMPLB_USE = $(CCOMPLB_USE) -FI Precomp.h
-!ENDIF
 
 all: $(PROGPATH)
 
@@ -204,11 +145,6 @@ $O:
 $O/asm:
 	if not exist "$O/asm" mkdir "$O/asm"
 
-!IF "$(CC)" != "clang-cl"
-# for link time code generation:
-# LFLAGS = $(LFLAGS) -LTCG
-!ENDIF
-
 $(PROGPATH): $O $O/asm $(OBJS) $(DEF_FILE)
 	link $(LFLAGS) -out:$(PROGPATH) $(OBJS) $(LIBS)
 
@@ -218,12 +154,3 @@ $O\resource.res: $(*B).rc
 !ENDIF
 $O\StdAfx.obj: $(*B).cpp
 	$(COMPL_PCH)
-
-predef: empty.c
-	$(CCOMPL)   /EP /Zc:preprocessor /PD
-predef2: A.cpp
-	$(COMPL)   -EP -Zc:preprocessor -PD
-predef3: A.cpp
-	$(COMPL)   -E -dM 
-predef4: A.cpp
-	$(COMPL_O2)   -E

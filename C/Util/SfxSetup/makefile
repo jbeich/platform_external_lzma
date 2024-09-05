@@ -1,9 +1,6 @@
 PROG = 7zS2.sfx
 MY_FIXED = 1
 
-CFLAGS = $(CFLAGS) \
-  -DZ7_EXTRACT_ONLY \
-
 C_OBJS = \
   $O\7zAlloc.obj \
   $O\7zArcIn.obj \

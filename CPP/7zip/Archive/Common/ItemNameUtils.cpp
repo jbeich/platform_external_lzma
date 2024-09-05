@@ -8,10 +8,7 @@ namespace NArchive {
 namespace NItemName {
 
 static const wchar_t kOsPathSepar = WCHAR_PATH_SEPARATOR;
-
-#if WCHAR_PATH_SEPARATOR != L'/'
 static const wchar_t kUnixPathSepar = L'/';
-#endif
 
 void ReplaceSlashes_OsToUnix
 #if WCHAR_PATH_SEPARATOR != L'/'
@@ -47,58 +44,17 @@ UString GetOsPath_Remove_TailSlash(const UString &name)
 }
 
 
-void ReplaceToOsSlashes_Remove_TailSlash(UString &name, bool
+void ReplaceToOsSlashes_Remove_TailSlash(UString &name)
+{
+  if (!name.IsEmpty())
+  {
     #if WCHAR_PATH_SEPARATOR != L'/'
-      useBackslashReplacement
+      name.Replace(kUnixPathSepar, kOsPathSepar);
     #endif
-    )
-{
-  if (name.IsEmpty())
-    return;
-
-  #if WCHAR_PATH_SEPARATOR != L'/'
-  {
-    // name.Replace(kUnixPathSepar, kOsPathSepar);
-    const unsigned len = name.Len();
-    for (unsigned i = 0; i < len; i++)
-    {
-      wchar_t c = name[i];
-      if (c == L'/')
-        c = WCHAR_PATH_SEPARATOR;
-      else if (useBackslashReplacement && c == L'\\')
-        c = WCHAR_IN_FILE_NAME_BACKSLASH_REPLACEMENT; // WSL scheme
-      else
-        continue;
-      name.ReplaceOneCharAtPos(i, c);
-    }
-  }
-  #endif
     
-  if (name.Back() == kOsPathSepar)
-    name.DeleteBack();
-}
-
-
-void NormalizeSlashes_in_FileName_for_OsPath(wchar_t *name, unsigned len)
-{
-  for (unsigned i = 0; i < len; i++)
-  {
-    wchar_t c = name[i];
-    if (c == L'/')
-      c = L'_';
-   #if WCHAR_PATH_SEPARATOR != L'/'
-    else if (c == L'\\')
-      c = WCHAR_IN_FILE_NAME_BACKSLASH_REPLACEMENT; // WSL scheme
-   #endif
-    else
-      continue;
-    name[i] = c;
+    if (name.Back() == kOsPathSepar)
+      name.DeleteBack();
   }
-}
-
-void NormalizeSlashes_in_FileName_for_OsPath(UString &name)
-{
-  NormalizeSlashes_in_FileName_for_OsPath(name.GetBuf(), name.Len());
 }
 
 
@@ -110,15 +66,12 @@ bool HasTailSlash(const AString &name, UINT
 {
   if (name.IsEmpty())
     return false;
-  char c;
+  char c =
     #if defined(_WIN32) && !defined(UNDER_CE)
-    if (codePage != CP_UTF8)
-      c = *CharPrevExA((WORD)codePage, name, name.Ptr(name.Len()), 0);
-    else
+      *CharPrevExA((WORD)codePage, name, name.Ptr(name.Len()), 0);
+    #else
+      name.Back();
     #endif
-    {
-      c = name.Back();
-    }
   return (c == '/');
 }
 
