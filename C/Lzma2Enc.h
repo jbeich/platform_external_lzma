@@ -1,15 +1,15 @@
 /* Lzma2Enc.h -- LZMA2 Encoder
-2023-04-13 : Igor Pavlov : Public domain */
+2017-07-27 : Igor Pavlov : Public domain */
 
-#ifndef ZIP7_INC_LZMA2_ENC_H
-#define ZIP7_INC_LZMA2_ENC_H
+#ifndef __LZMA2_ENC_H
+#define __LZMA2_ENC_H
 
 #include "LzmaEnc.h"
 
 EXTERN_C_BEGIN
 
-#define LZMA2_ENC_PROPS_BLOCK_SIZE_AUTO   0
-#define LZMA2_ENC_PROPS_BLOCK_SIZE_SOLID  ((UInt64)(Int64)-1)
+#define LZMA2_ENC_PROPS__BLOCK_SIZE__AUTO 0
+#define LZMA2_ENC_PROPS__BLOCK_SIZE__SOLID ((UInt64)(Int64)-1)
 
 typedef struct
 {
@@ -36,9 +36,7 @@ SRes:
   SZ_ERROR_THREAD - error in multithreading functions (only for Mt version)
 */
 
-typedef struct CLzma2Enc CLzma2Enc;
-typedef CLzma2Enc * CLzma2EncHandle;
-// Z7_DECLARE_HANDLE(CLzma2EncHandle)
+typedef void * CLzma2EncHandle;
 
 CLzma2EncHandle Lzma2Enc_Create(ISzAllocPtr alloc, ISzAllocPtr allocBig);
 void Lzma2Enc_Destroy(CLzma2EncHandle p);
@@ -46,11 +44,11 @@ SRes Lzma2Enc_SetProps(CLzma2EncHandle p, const CLzma2EncProps *props);
 void Lzma2Enc_SetDataSize(CLzma2EncHandle p, UInt64 expectedDataSiize);
 Byte Lzma2Enc_WriteProperties(CLzma2EncHandle p);
 SRes Lzma2Enc_Encode2(CLzma2EncHandle p,
-    ISeqOutStreamPtr outStream,
+    ISeqOutStream *outStream,
     Byte *outBuf, size_t *outBufSize,
-    ISeqInStreamPtr inStream,
+    ISeqInStream *inStream,
     const Byte *inData, size_t inDataSize,
-    ICompressProgressPtr progress);
+    ICompressProgress *progress);
 
 EXTERN_C_END
 

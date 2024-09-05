@@ -1,46 +1,46 @@
 /* MtDec.h -- Multi-thread Decoder
-2023-04-02 : Igor Pavlov : Public domain */
+2018-07-04 : Igor Pavlov : Public domain */
 
-#ifndef ZIP7_INC_MT_DEC_H
-#define ZIP7_INC_MT_DEC_H
+#ifndef __MT_DEC_H
+#define __MT_DEC_H
 
 #include "7zTypes.h"
 
-#ifndef Z7_ST
+#ifndef _7ZIP_ST
 #include "Threads.h"
 #endif
 
 EXTERN_C_BEGIN
 
-#ifndef Z7_ST
+#ifndef _7ZIP_ST
 
-#ifndef Z7_ST
-  #define MTDEC_THREADS_MAX 32
+#ifndef _7ZIP_ST
+  #define MTDEC__THREADS_MAX 32
 #else
-  #define MTDEC_THREADS_MAX 1
+  #define MTDEC__THREADS_MAX 1
 #endif
 
 
 typedef struct
 {
-  ICompressProgressPtr progress;
+  ICompressProgress *progress;
   SRes res;
   UInt64 totalInSize;
   UInt64 totalOutSize;
   CCriticalSection cs;
 } CMtProgress;
 
-void MtProgress_Init(CMtProgress *p, ICompressProgressPtr progress);
+void MtProgress_Init(CMtProgress *p, ICompressProgress *progress);
 SRes MtProgress_Progress_ST(CMtProgress *p);
 SRes MtProgress_ProgressAdd(CMtProgress *p, UInt64 inSize, UInt64 outSize);
 SRes MtProgress_GetError(CMtProgress *p);
 void MtProgress_SetError(CMtProgress *p, SRes res);
 
-struct CMtDec;
+struct _CMtDec;
 
 typedef struct
 {
-  struct CMtDec_ *mtDec;
+  struct _CMtDec *mtDec;
   unsigned index;
   void *inBuf;
 
@@ -108,16 +108,15 @@ typedef struct
   */
   SRes (*Write)(void *p, unsigned coderIndex,
       BoolInt needWriteToStream,
-      const Byte *src, size_t srcSize, BoolInt isCross,
+      const Byte *src, size_t srcSize,
       // int srcFinished,
       BoolInt *needContinue,
       BoolInt *canRecode);
-
-} IMtDecCallback2;
-
+} IMtDecCallback;
 
 
-typedef struct CMtDec_
+
+typedef struct _CMtDec
 {
   /* input variables */
   
@@ -126,14 +125,14 @@ typedef struct CMtDec_
   // size_t inBlockMax;
   unsigned numThreadsMax_2;
 
-  ISeqInStreamPtr inStream;
+  ISeqInStream *inStream;
   // const Byte *inData;
   // size_t inDataSize;
 
-  ICompressProgressPtr progress;
+  ICompressProgress *progress;
   ISzAllocPtr alloc;
 
-  IMtDecCallback2 *mtCallback;
+  IMtDecCallback *mtCallback;
   void *mtCallbackObject;
 
   
@@ -171,11 +170,11 @@ typedef struct CMtDec_
   unsigned filledThreadStart;
   unsigned numFilledThreads;
 
-  #ifndef Z7_ST
+  #ifndef _7ZIP_ST
   BoolInt needInterrupt;
   UInt64 interruptIndex;
   CMtProgress mtProgress;
-  CMtDecThread threads[MTDEC_THREADS_MAX];
+  CMtDecThread threads[MTDEC__THREADS_MAX];
   #endif
 } CMtDec;
 

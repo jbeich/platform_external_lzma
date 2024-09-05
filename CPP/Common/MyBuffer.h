@@ -1,15 +1,12 @@
 // Common/MyBuffer.h
 
-#ifndef ZIP7_INC_COMMON_MY_BUFFER_H
-#define ZIP7_INC_COMMON_MY_BUFFER_H
-
-#include <string.h>
+#ifndef __COMMON_MY_BUFFER_H
+#define __COMMON_MY_BUFFER_H
 
 #include "Defs.h"
-#include "MyTypes.h"
 
 /* 7-Zip now uses CBuffer only as CByteBuffer.
-   So there is no need to use Z7_ARRAY_NEW macro in CBuffer code. */
+   So there is no need to use MY_ARRAY_NEW macro in CBuffer code. */
 
 template <class T> class CBuffer
 {
@@ -22,23 +19,16 @@ public:
     if (_items)
     {
       delete []_items;
-      _items = NULL;
+      _items = 0;
     }
     _size = 0;
   }
   
-  CBuffer(): _items(NULL), _size(0) {}
-  CBuffer(size_t size): _items(NULL), _size(0)
+  CBuffer(): _items(0), _size(0) {};
+  CBuffer(size_t size): _items(0), _size(0) { _items = new T[size]; _size = size; }
+  CBuffer(const CBuffer &buffer): _items(0), _size(0)
   {
-    if (size != 0)
-    {
-      _items = new T[size];
-      _size = size;
-    }
-  }
-  CBuffer(const CBuffer &buffer): _items(NULL), _size(0)
-  {
-    const size_t size = buffer._size;
+    size_t size = buffer._size;
     if (size != 0)
     {
       _items = new T[size];
@@ -101,12 +91,6 @@ public:
     _size = newSize;
   }
 
-  void Wipe()
-  {
-    if (_size != 0)
-      memset(_items, 0, _size * sizeof(T));
-  }
-
   CBuffer& operator=(const CBuffer &buffer)
   {
     if (&buffer != this)
@@ -143,17 +127,6 @@ bool operator!=(const CBuffer<T>& b1, const CBuffer<T>& b2)
 typedef CBuffer<unsigned char> CByteBuffer;
 
 
-class CByteBuffer_Wipe: public CByteBuffer
-{
-  Z7_CLASS_NO_COPY(CByteBuffer_Wipe)
-public:
-  // CByteBuffer_Wipe(): CBuffer<unsigned char>() {}
-  CByteBuffer_Wipe(size_t size): CBuffer<unsigned char>(size) {}
-  ~CByteBuffer_Wipe() { Wipe(); }
-};
-
-
-
 template <class T> class CObjArray
 {
 protected:
@@ -166,17 +139,17 @@ public:
   void Free()
   {
     delete []_items;
-    _items = NULL;
+    _items = 0;
   }
-  CObjArray(size_t size): _items(NULL)
+  CObjArray(size_t size): _items(0)
   {
     if (size != 0)
     {
-      Z7_ARRAY_NEW(_items, T, size)
+      MY_ARRAY_NEW(_items, T, size)
       // _items = new T[size];
     }
   }
-  CObjArray(): _items(NULL) {}
+  CObjArray(): _items(0) {};
   ~CObjArray() { delete []_items; }
   
   operator       T *()       { return _items; }
@@ -185,8 +158,8 @@ public:
   void Alloc(size_t newSize)
   {
     delete []_items;
-    _items = NULL;
-    Z7_ARRAY_NEW(_items, T, newSize)
+    _items = 0;
+    MY_ARRAY_NEW(_items, T, newSize)
     // _items = new T[newSize];
   }
 };
@@ -210,12 +183,12 @@ public:
   void Free()
   {
     delete []_items;
-    _items = NULL;
+    _items = 0;
     _size = 0;
   }
-  CObjArray2(): _items(NULL), _size(0) {}
+  CObjArray2(): _items(0), _size(0) {};
   /*
-  CObjArray2(const CObjArray2 &buffer): _items(NULL), _size(0)
+  CObjArray2(const CObjArray2 &buffer): _items(0), _size(0)
   {
     size_t newSize = buffer._size;
     if (newSize != 0)
@@ -230,7 +203,7 @@ public:
   }
   */
   /*
-  CObjArray2(size_t size): _items(NULL), _size(0)
+  CObjArray2(size_t size): _items(0), _size(0)
   {
     if (size != 0)
     {
@@ -256,7 +229,7 @@ public:
     T *newBuffer = NULL;
     if (size != 0)
     {
-      Z7_ARRAY_NEW(newBuffer, T, size)
+      MY_ARRAY_NEW(newBuffer, T, size)
       // newBuffer = new T[size];
     }
     delete []_items;
