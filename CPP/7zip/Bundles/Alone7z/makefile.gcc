@@ -37,11 +37,9 @@ else
 MT_OBJS = \
   $O/LzFindMt.o \
   $O/LzFindOpt.o \
-  $O/Threads.o \
   $O/StreamBinder.o \
   $O/VirtThread.o \
-
-
+  $O/Threads.o \
 
 
 
@@ -54,10 +52,9 @@ LOCAL_FLAGS_SYS =
 ifdef IS_MINGW
 
 LOCAL_FLAGS_SYS = \
+  -DZ7_LARGE_PAGES \
+  -DZ7_LONG_PATH \
   -DZ7_DEVICE_FILE \
-
-#  -DZ7_LARGE_PAGES \
-#  -DZ7_LONG_PATH \
 
 SYS_OBJS = \
   $O/FileSystem.o \
@@ -82,6 +79,7 @@ LOCAL_FLAGS = \
 CONSOLE_OBJS = \
   $O/BenchCon.o \
   $O/ConsoleClose.o \
+  $O/DynLimBuf.o \
   $O/ExtractCallbackConsole.o \
   $O/HashCon.o \
   $O/List.o \
@@ -118,7 +116,6 @@ COMMON_OBJS = \
   $O/CommandLineParser.o \
   $O/CRC.o \
   $O/CrcReg.o \
-  $O/DynLimBuf.o \
   $O/IntToString.o \
   $O/ListFileUtils.o \
   $O/LzFindPrepare.o \
@@ -127,10 +124,10 @@ COMMON_OBJS = \
   $O/NewHandler.o \
   $O/Sha256Prepare.o \
   $O/Sha256Reg.o \
-  $O/StdInStream.o \
-  $O/StdOutStream.o \
   $O/StringConvert.o \
   $O/StringToInt.o \
+  $O/StdInStream.o \
+  $O/StdOutStream.o \
   $O/UTFConvert.o \
   $O/Wildcard.o \
   $O/XzCrc64Init.o \
@@ -228,11 +225,7 @@ CRYPTO_OBJS = \
   $O/RandGen.o \
 
 C_OBJS = \
-  $O/7zCrc.o \
-  $O/7zCrcOpt.o \
   $O/7zStream.o \
-  $O/Aes.o \
-  $O/AesOpt.o \
   $O/Alloc.o \
   $O/Bcj2.o \
   $O/Bcj2Enc.o \
@@ -258,6 +251,10 @@ C_OBJS = \
   $O/XzIn.o \
   $O/XzCrc64.o \
   $O/XzCrc64Opt.o \
+  $O/7zCrc.o \
+  $O/7zCrcOpt.o \
+  $O/Aes.o \
+  $O/AesOpt.o \
 
 
 OBJS = \

@@ -1,5 +1,5 @@
 /* Threads.h -- multithreading library
-2024-03-28 : Igor Pavlov : Public domain */
+2023-04-02 : Igor Pavlov : Public domain */
 
 #ifndef ZIP7_INC_THREADS_H
 #define ZIP7_INC_THREADS_H
@@ -9,21 +9,12 @@
 
 #else
 
-#include "Compiler.h"
-
-// #define Z7_AFFINITY_DISABLE
 #if defined(__linux__)
 #if !defined(__APPLE__) && !defined(_AIX) && !defined(__ANDROID__)
 #ifndef Z7_AFFINITY_DISABLE
 #define Z7_AFFINITY_SUPPORTED
 // #pragma message(" ==== Z7_AFFINITY_SUPPORTED")
-#if !defined(_GNU_SOURCE)
-// #pragma message(" ==== _GNU_SOURCE set")
-// we need _GNU_SOURCE for cpu_set_t, if we compile for MUSL
-Z7_DIAGNOSTIC_IGNORE_BEGIN_RESERVED_MACRO_IDENTIFIER
-#define _GNU_SOURCE
-Z7_DIAGNOSTIC_IGNORE_END_RESERVED_MACRO_IDENTIFIER
-#endif
+// #define _GNU_SOURCE
 #endif
 #endif
 #endif
@@ -182,7 +173,7 @@ WRes CriticalSection_Init(CCriticalSection *p);
 
 #else // _WIN32
 
-typedef struct
+typedef struct _CEvent
 {
   int _created;
   int _manual_reset;
@@ -208,7 +199,7 @@ WRes Event_Wait(CEvent *p);
 WRes Event_Close(CEvent *p);
 
 
-typedef struct
+typedef struct _CSemaphore
 {
   int _created;
   UInt32 _count;
@@ -228,7 +219,7 @@ WRes Semaphore_Wait(CSemaphore *p);
 WRes Semaphore_Close(CSemaphore *p);
 
 
-typedef struct
+typedef struct _CCriticalSection
 {
   pthread_mutex_t _mutex;
 } CCriticalSection;
@@ -239,7 +230,6 @@ void CriticalSection_Enter(CCriticalSection *cs);
 void CriticalSection_Leave(CCriticalSection *cs);
 
 LONG InterlockedIncrement(LONG volatile *addend);
-LONG InterlockedDecrement(LONG volatile *addend);
 
 #endif  // _WIN32
 

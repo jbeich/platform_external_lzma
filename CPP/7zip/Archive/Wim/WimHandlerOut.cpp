@@ -20,8 +20,6 @@
 #include "../../Crypto/RandGen.h"
 #include "../../Crypto/Sha1Cls.h"
 
-#include "../Common/OutStreamWithSha1.h"
-
 #include "WimHandler.h"
 
 using namespace NWindows;
@@ -347,6 +345,40 @@ void CStreamInfo::WriteTo(Byte *p) const
 }
 
 
+Z7_CLASS_IMP_NOQIB_1(
+  CInStreamWithSha1
+  , ISequentialInStream
+)
+  CMyComPtr<ISequentialInStream> _stream;
+  UInt64 _size;
+  // NCrypto::NSha1::CContext _sha;
+  CAlignedBuffer1 _sha;
+  CSha1 *Sha() { return (CSha1 *)(void *)(Byte *)_sha; }
+public:
+  CInStreamWithSha1(): _sha(sizeof(CSha1)) {}
+  void SetStream(ISequentialInStream *stream) { _stream = stream;  }
+  void Init()
+  {
+    _size = 0;
+    Sha1_Init(Sha());
+  }
+  void ReleaseStream() { _stream.Release(); }
+  UInt64 GetSize() const { return _size; }
+  void Final(Byte *digest) { Sha1_Final(Sha(), digest); }
+};
+
+Z7_COM7F_IMF(CInStreamWithSha1::Read(void *data, UInt32 size, UInt32 *processedSize))
+{
+  UInt32 realProcessedSize;
+  const HRESULT result = _stream->Read(data, size, &realProcessedSize);
+  _size += realProcessedSize;
+  Sha1_Update(Sha(), (const Byte *)data, realProcessedSize);
+  if (processedSize)
+    *processedSize = realProcessedSize;
+  return result;
+}
+
+
 static void SetFileTimeToMem(Byte *p, const FILETIME &ft)
 {
   Set32(p, ft.dwLowDateTime)
@@ -567,14 +599,14 @@ void CDb::WriteOrderList(const CDir &tree)
 
 static void AddTag_ToString(AString &s, const char *name, const char *value)
 {
-  s.Add_Char('<');
+  s += '<';
   s += name;
-  s.Add_Char('>');
+  s += '>';
   s += value;
-  s.Add_Char('<');
-  s.Add_Slash();
+  s += '<';
+  s += '/';
   s += name;
-  s.Add_Char('>');
+  s += '>';
 }
 
 
@@ -588,7 +620,7 @@ static void AddTagUInt64_ToString(AString &s, const char *name, UInt64 value)
 
 static CXmlItem &AddUniqueTag(CXmlItem &parentItem, const char *name)
 {
-  const int index = parentItem.FindSubTag(name);
+  int index = parentItem.FindSubTag(name);
   if (index < 0)
   {
     CXmlItem &subItem = parentItem.SubItems.AddNew();
@@ -647,7 +679,8 @@ static void AddTag_Time(CXmlItem &parentItem, const char *name, const FILETIME &
 
 static void AddTag_String_IfEmpty(CXmlItem &parentItem, const char *name, const char *value)
 {
-  if (parentItem.FindSubTag(name) >= 0)
+  int index = parentItem.FindSubTag(name);
+  if (index >= 0)
     return;
   CXmlItem &tag = parentItem.SubItems.AddNew();
   tag.IsTag = true;
@@ -1061,7 +1094,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
     {
       for (;;)
       {
-        const wchar_t c = *path++;
+        wchar_t c = *path++;
         if (c == 0)
           break;
         if (c == WCHAR_PATH_SEPARATOR || c == L'/')
@@ -1349,9 +1382,12 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
   RINOK(callback->SetTotal(complexity))
   UInt64 totalComplexity = complexity;
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  NCompress::CCopyCoder *copyCoderSpec = new NCompress::CCopyCoder;
+  CMyComPtr<ICompressCoder> copyCoder = copyCoderSpec;
+
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(callback, true);
-  CMyComPtr2_Create<ICompressCoder, NCompress::CCopyCoder> copyCoder;
 
   complexity = 0;
 
@@ -1383,7 +1419,8 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
 
   UInt64 curPos = kHeaderSizeMax;
 
-  CMyComPtr2_Create<ISequentialInStream, CInStreamWithSha1> inShaStream;
+  CInStreamWithSha1 *inShaStreamSpec = new CInStreamWithSha1;
+  CMyComPtr<ISequentialInStream> inShaStream = inShaStreamSpec;
 
   CLimitedSequentialInStream *inStreamLimitedSpec = NULL;
   CMyComPtr<ISequentialInStream> inStreamLimited;
@@ -1455,7 +1492,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
      
     if (!rs.IsSolid() || rs.IsSolidSmall())
     {
-      const int find = AddUniqHash(streams.ConstData(), sortedHashes, siOld.Hash, (int)streamIndex);
+      const int find = AddUniqHash(&streams.Front(), sortedHashes, siOld.Hash, (int)streamIndex);
       if (find != -1)
         return E_FAIL; // two streams with same SHA-1
     }
@@ -1464,8 +1501,8 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
     {
       RINOK(InStream_SeekSet(_volumes[siOld.PartNumber].Stream, rs.Offset))
       inStreamLimitedSpec->Init(rs.PackSize);
-      RINOK(copyCoder.Interface()->Code(inStreamLimited, outStream, NULL, NULL, lps))
-      if (copyCoder->TotalSize != rs.PackSize)
+      RINOK(copyCoder->Code(inStreamLimited, outStream, NULL, NULL, progress))
+      if (copyCoderSpec->TotalSize != rs.PackSize)
         return E_FAIL;
       s.Resource.Offset = curPos;
       curPos += rs.PackSize;
@@ -1527,7 +1564,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
       
       const CStreamInfo &siOld = _db.DataStreams[item.StreamIndex];
 
-      const int index = AddUniqHash(streams.ConstData(), sortedHashes, siOld.Hash, -1);
+      const int index = AddUniqHash(&streams.Front(), sortedHashes, siOld.Hash, -1);
       // we must have written that stream already
       if (index == -1)
         return E_FAIL;
@@ -1618,7 +1655,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
         Byte hash[kHashSize];
         sha1.Final(hash);
         
-        int index = AddUniqHash(streams.ConstData(), sortedHashes, hash, (int)streams.Size());
+        int index = AddUniqHash(&streams.Front(), sortedHashes, hash, (int)streams.Size());
 
         if (index != -1)
           streams[index].RefCount++;
@@ -1647,13 +1684,13 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
       }
       else
       {
-        inShaStream->SetStream(fileInStream);
+        inShaStreamSpec->SetStream(fileInStream);
 
         CMyComPtr<IInStream> inSeekStream;
         fileInStream.QueryInterface(IID_IInStream, (void **)&inSeekStream);
         
         fileInStream.Release();
-        inShaStream->Init();
+        inShaStreamSpec->Init();
         UInt64 offsetBlockSize = 0;
         /*
         if (useResourceCompression)
@@ -1674,16 +1711,16 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
         
         if (inSeekStream /* && !sortedHashes.IsEmpty() */)
         {
-          RINOK(copyCoder.Interface()->Code(inShaStream, NULL, NULL, NULL, lps))
-          size = copyCoder->TotalSize;
+          RINOK(copyCoder->Code(inShaStream, NULL, NULL, NULL, progress))
+          size = copyCoderSpec->TotalSize;
           if (size == 0)
             needWritePass = false;
           else
           {
             Byte hash[kHashSize];
-            inShaStream->Final(hash);
+            inShaStreamSpec->Final(hash);
 
-            index = AddUniqHash(streams.ConstData(), sortedHashes, hash, -1);
+            index = AddUniqHash(&streams.Front(), sortedHashes, hash, -1);
             if (index != -1)
             {
               streams[index].RefCount++;
@@ -1692,15 +1729,15 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
             else
             {
               RINOK(InStream_SeekToBegin(inSeekStream))
-              inShaStream->Init();
+              inShaStreamSpec->Init();
             }
           }
         }
         
         if (needWritePass)
         {
-          RINOK(copyCoder.Interface()->Code(inShaStream, outStream, NULL, NULL, lps))
-          size = copyCoder->TotalSize;
+          RINOK(copyCoder->Code(inShaStream, outStream, NULL, NULL, progress))
+          size = copyCoderSpec->TotalSize;
         }
        
         if (size != 0)
@@ -1709,9 +1746,9 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
           {
             Byte hash[kHashSize];
             const UInt64 packSize = offsetBlockSize + size;
-            inShaStream->Final(hash);
+            inShaStreamSpec->Final(hash);
             
-            index = AddUniqHash(streams.ConstData(), sortedHashes, hash, (int)streams.Size());
+            index = AddUniqHash(&streams.Front(), sortedHashes, hash, (int)streams.Size());
             
             if (index != -1)
             {
@@ -1768,8 +1805,8 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
       
       RINOK(InStream_SeekSet(_volumes[1].Stream, s.Resource.Offset))
       inStreamLimitedSpec->Init(s.Resource.PackSize);
-      RINOK(copyCoder.Interface()->Code(inStreamLimited, outStream, NULL, NULL, lps))
-      if (copyCoder->TotalSize != s.Resource.PackSize)
+      RINOK(copyCoder->Code(inStreamLimited, outStream, NULL, NULL, progress))
+      if (copyCoderSpec->TotalSize != s.Resource.PackSize)
         return E_FAIL;
 
       s.Resource.Offset = curPos;
@@ -1837,7 +1874,7 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outSeqStream, UInt32 nu
       Set32((Byte *)meta, (UInt32)pos) // size of security data
     }
     
-    db.Hashes = streams.ConstData();
+    db.Hashes = &streams.Front();
     db.WriteTree(tree, (Byte *)meta, pos);
 
     {

@@ -89,8 +89,7 @@ static int GetColumnAlign(PROPID propID, VARTYPE varType)
 
 static int ItemProperty_Compare_NameFirst(void *const *a1, void *const *a2, void * /* param */)
 {
-  return (*(*((const CPropColumn *const *)a1))).Compare_NameFirst
-         (*(*((const CPropColumn *const *)a2)));
+  return (*(*((const CPropColumn *const *)a1))).Compare_NameFirst(*(*((const CPropColumn *const *)a2)));
 }
 
 HRESULT CPanel::InitColumns()
@@ -126,7 +125,7 @@ HRESULT CPanel::InitColumns()
 
   _columns.Clear();
 
-  const bool isFsFolder = IsFSFolder() || IsAltStreamsFolder();
+  bool isFsFolder = IsFSFolder() || IsAltStreamsFolder();
 
   {
     UInt32 numProps;
@@ -183,7 +182,7 @@ HRESULT CPanel::InitColumns()
     {
       CMyComBSTR name;
       PROPID propID;
-      const HRESULT res = _folderRawProps->GetRawPropInfo(i, &name, &propID);
+      HRESULT res = _folderRawProps->GetRawPropInfo(i, &name, &propID);
       if (res != S_OK)
         continue;
       CPropColumn prop;
@@ -551,7 +550,7 @@ HRESULT CPanel::RefreshListCtrl(const CSelectedState &state)
   {
     NCOM::CPropVariant prop;
     _isDirVector.ClearAndSetSize(numItems);
-    bool *vec = _isDirVector.NonConstData();
+    bool *vec = (bool *)&_isDirVector.Front();
     HRESULT hres = S_OK;
     unsigned i;
     for (i = 0; i < numItems; i++)
@@ -893,7 +892,7 @@ void CPanel::Get_ItemIndices_Selected(CRecordVector<UInt32> &indices) const
   }
   HeapSort(&indices.Front(), indices.Size());
   */
-  const bool *v = _selectedStatusVector.ConstData();
+  const bool *v = &_selectedStatusVector.Front();
   const unsigned size = _selectedStatusVector.Size();
   for (unsigned i = 0; i < size; i++)
     if (v[i])
@@ -927,7 +926,7 @@ void CPanel::Get_ItemIndices_All(CRecordVector<UInt32> &indices) const
   if (_folder->GetNumberOfItems(&numItems) != S_OK)
     return;
   indices.ClearAndSetSize(numItems);
-  UInt32 *vec = indices.NonConstData();
+  UInt32 *vec = (UInt32 *)&indices.Front();
   for (UInt32 i = 0; i < numItems; i++)
     vec[i] = i;
 }
@@ -1259,7 +1258,7 @@ void CPanel::SaveListViewInfo()
   CListViewInfo viewInfo;
   
   // PROPID sortPropID = _columns[_sortIndex].ID;
-  const PROPID sortPropID = _sortID;
+  PROPID sortPropID = _sortID;
   
   // we save columns as "sorted by order" to registry
 
@@ -1301,9 +1300,9 @@ void CPanel::SaveListViewInfo()
 }
 
 
-bool CPanel::OnRightClick(MY_NMLISTVIEW_NMITEMACTIVATE *itemActivate, LRESULT &result)
+bool CPanel::OnRightClick(MY_NMLISTVIEW_NMITEMACTIVATE *itemActiveate, LRESULT &result)
 {
-  if (itemActivate->hdr.hwndFrom == HWND(_listView))
+  if (itemActiveate->hdr.hwndFrom == HWND(_listView))
     return false;
   POINT point;
   ::GetCursorPos(&point);

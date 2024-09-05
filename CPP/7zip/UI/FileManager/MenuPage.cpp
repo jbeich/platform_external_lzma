@@ -123,9 +123,9 @@ bool CMenuPage::OnInit()
       bit64.Replace(L"64", L"32");
     #endif
     s.Add_Space();
-    s.Add_Char('(');
+    s += '(';
     s += bit64;
-    s.Add_Char(')');
+    s += ')';
     SetItemText(IDX_SYSTEM_INTEGRATE_TO_MENU_2, s);
   }
 

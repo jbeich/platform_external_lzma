@@ -184,23 +184,23 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
   {
     const CUpdateItem &ui = updateItems[i];
     if (ui.NewData)
-    {
-      if (ui.Size == (UInt64)(Int64)-1)
-        break;
       complexity += ui.Size;
-    }
     else
       complexity += inputItems[(unsigned)ui.IndexInArc].Get_FullSize_Aligned();
   }
 
-  if (i == updateItems.Size())
-    RINOK(updateCallback->SetTotal(complexity))
+  RINOK(updateCallback->SetTotal(complexity))
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  NCompress::CCopyCoder *copyCoderSpec = new NCompress::CCopyCoder;
+  CMyComPtr<ICompressCoder> copyCoder = copyCoderSpec;
+
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(updateCallback, true);
-  CMyComPtr2_Create<ICompressCoder, NCompress::CCopyCoder> copyCoder;
-  CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> inStreamLimited;
-  inStreamLimited->SetStream(inStream);
+
+  CLimitedSequentialInStream *streamSpec = new CLimitedSequentialInStream;
+  CMyComPtr<ISequentialInStream> inStreamLimited(streamSpec);
+  streamSpec->SetStream(inStream);
 
   complexity = 0;
 
@@ -271,10 +271,9 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
       item.SparseBlocks.Clear();
       item.PackSize = ui.Size;
       item.Size = ui.Size;
-#if 0
       if (ui.Size == (UInt64)(Int64)-1)
         return E_INVALIDARG;
-#endif
+
       CMyComPtr<ISequentialInStream> fileInStream;
 
       bool needWrite = true;
@@ -354,7 +353,6 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
                 if (prop.vt != VT_UI8)
                   return E_INVALIDARG;
                 const UInt64 size = prop.uhVal.QuadPart;
-                // printf("\nTAR after GetProperty(kpidSize size = %8d\n", (unsigned)size);
                 item.PackSize = size;
                 item.Size = size;
               }
@@ -411,11 +409,6 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
 
       if (needWrite)
       {
-        if (fileInStream)
-        // if (item.PackSize == (UInt64)(Int64)-1)
-        if (item.Size == (UInt64)(Int64)-1)
-          return E_INVALIDARG;
-
         const UInt64 headerPos = outArchive.Pos;
         // item.PackSize = ((UInt64)1 << 33); // for debug
 
@@ -427,7 +420,6 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
         {
           for (unsigned numPasses = 0;; numPasses++)
           {
-            // printf("\nTAR numPasses = %d" " old size = %8d\n", numPasses, (unsigned)item.PackSize);
             /* we support 2 attempts to write header:
                 pass-0: main pass:
                 pass-1: additional pass, if size_of_file and size_of_header are changed */
@@ -439,12 +431,12 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
             }
             
             const UInt64 dataPos = outArchive.Pos;
-            RINOK(copyCoder.Interface()->Code(fileInStream, outStream, NULL, NULL, lps))
-            outArchive.Pos += copyCoder->TotalSize;
-            RINOK(outArchive.Write_AfterDataResidual(copyCoder->TotalSize))
-            // printf("\nTAR after Code old size = %8d copyCoder->TotalSize = %8d \n", (unsigned)item.PackSize, (unsigned)copyCoder->TotalSize);
+            RINOK(copyCoder->Code(fileInStream, outStream, NULL, NULL, progress))
+            outArchive.Pos += copyCoderSpec->TotalSize;
+            RINOK(outArchive.Write_AfterDataResidual(copyCoderSpec->TotalSize))
+            
             // if (numPasses >= 10) // for debug
-            if (copyCoder->TotalSize == item.PackSize)
+            if (copyCoderSpec->TotalSize == item.PackSize)
               break;
             
             if (opCallback)
@@ -459,7 +451,7 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
             const UInt64 nextPos = outArchive.Pos;
             RINOK(outSeekStream->Seek(-(Int64)(nextPos - headerPos), STREAM_SEEK_CUR, NULL))
             outArchive.Pos = headerPos;
-            item.PackSize = copyCoder->TotalSize;
+            item.PackSize = copyCoderSpec->TotalSize;
             
             RINOK(outArchive.WriteHeader(item))
             
@@ -545,12 +537,12 @@ HRESULT UpdateArchive(IInStream *inStream, ISequentialOutStream *outStream,
       if (size != 0)
       {
         RINOK(InStream_SeekSet(inStream, pos))
-        inStreamLimited->Init(size);
+        streamSpec->Init(size);
         if (outSeekStream && setRestriction)
           RINOK(setRestriction->SetRestriction(0, 0))
         // 22.00 : we copy Residual data from old archive to new archive instead of zeroing
-        RINOK(copyCoder.Interface()->Code(inStreamLimited, outStream, NULL, NULL, lps))
-        if (copyCoder->TotalSize != size)
+        RINOK(copyCoder->Code(inStreamLimited, outStream, NULL, NULL, progress))
+        if (copyCoderSpec->TotalSize != size)
           return E_FAIL;
         outArchive.Pos += size;
         // RINOK(outArchive.Write_AfterDataResidual(existItem.PackSize));

@@ -1,5 +1,5 @@
 /* XzDec.c -- Xz Decode
-2024-03-01 : Igor Pavlov : Public domain */
+2023-04-13 : Igor Pavlov : Public domain */
 
 #include "Precomp.h"
 
@@ -105,32 +105,30 @@ static SRes XzBcFilterState_SetProps(void *pp, const Byte *props, size_t propSiz
   {
     if (propSize != 1)
       return SZ_ERROR_UNSUPPORTED;
-    p->delta = (UInt32)props[0] + 1;
+    p->delta = (unsigned)props[0] + 1;
   }
   else
   {
     if (propSize == 4)
     {
-      const UInt32 v = GetUi32(props);
+      UInt32 v = GetUi32(props);
       switch (p->methodId)
       {
         case XZ_ID_PPC:
         case XZ_ID_ARM:
         case XZ_ID_SPARC:
         case XZ_ID_ARM64:
-          if (v & 3)
+          if ((v & 3) != 0)
             return SZ_ERROR_UNSUPPORTED;
           break;
         case XZ_ID_ARMT:
-        case XZ_ID_RISCV:
-          if (v & 1)
+          if ((v & 1) != 0)
             return SZ_ERROR_UNSUPPORTED;
           break;
         case XZ_ID_IA64:
-          if (v & 0xf)
+          if ((v & 0xF) != 0)
             return SZ_ERROR_UNSUPPORTED;
           break;
-        default: break;
       }
       p->ip = v;
     }
@@ -153,13 +151,12 @@ static void XzBcFilterState_Init(void *pp)
 
 static const z7_Func_BranchConv g_Funcs_BranchConv_RISC_Dec[] =
 {
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_PPC),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_IA64),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_ARM),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_ARMT),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_SPARC),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_ARM64),
-  Z7_BRANCH_CONV_DEC_2 (BranchConv_RISCV)
+  Z7_BRANCH_CONV_DEC(PPC),
+  Z7_BRANCH_CONV_DEC(IA64),
+  Z7_BRANCH_CONV_DEC(ARM),
+  Z7_BRANCH_CONV_DEC(ARMT),
+  Z7_BRANCH_CONV_DEC(SPARC),
+  Z7_BRANCH_CONV_DEC(ARM64)
 };
 
 static SizeT XzBcFilterStateBase_Filter_Dec(CXzBcFilterStateBase *p, Byte *data, SizeT size)
@@ -265,7 +262,7 @@ static SRes XzBcFilterState_Code2(void *pp,
 
 
 #define XZ_IS_SUPPORTED_FILTER_ID(id) \
-    ((id) >= XZ_ID_Delta && (id) <= XZ_ID_RISCV)
+    ((id) >= XZ_ID_Delta && (id) <= XZ_ID_ARM64)
      
 SRes Xz_StateCoder_Bc_SetFromMethod_Func(IStateCoder *p, UInt64 id,
     Xz_Func_BcFilterStateBase_Filter func, ISzAllocPtr alloc)
@@ -544,12 +541,13 @@ static SRes MixCoder_SetFromMethod(CMixCoder *p, unsigned coderIndex, UInt64 met
 {
   IStateCoder *sc = &p->coders[coderIndex];
   p->ids[coderIndex] = methodId;
-  if (methodId == XZ_ID_LZMA2)
-    return Lzma2State_SetFromMethod(sc, outBuf, outBufSize, p->alloc);
-#ifdef USE_SUBBLOCK
-  if (methodId == XZ_ID_Subblock)
-    return SbState_SetFromMethod(sc, p->alloc);
-#endif
+  switch (methodId)
+  {
+    case XZ_ID_LZMA2: return Lzma2State_SetFromMethod(sc, outBuf, outBufSize, p->alloc);
+    #ifdef USE_SUBBLOCK
+    case XZ_ID_Subblock: return SbState_SetFromMethod(sc, p->alloc);
+    #endif
+  }
   if (coderIndex == 0)
     return SZ_ERROR_UNSUPPORTED;
   return Xz_StateCoder_Bc_SetFromMethod_Func(sc, methodId,
@@ -560,8 +558,10 @@ static SRes MixCoder_SetFromMethod(CMixCoder *p, unsigned coderIndex, UInt64 met
 static SRes MixCoder_ResetFromMethod(CMixCoder *p, unsigned coderIndex, UInt64 methodId, Byte *outBuf, size_t outBufSize)
 {
   IStateCoder *sc = &p->coders[coderIndex];
-  if (methodId == XZ_ID_LZMA2)
-    return Lzma2State_ResetOutBuf(sc, outBuf, outBufSize);
+  switch (methodId)
+  {
+    case XZ_ID_LZMA2: return Lzma2State_ResetOutBuf(sc, outBuf, outBufSize);
+  }
   return SZ_ERROR_UNSUPPORTED;
 }
 
@@ -804,7 +804,7 @@ static BoolInt Xz_CheckFooter(CXzStreamFlags flags, UInt64 indexSize, const Byte
 }
 
 #define READ_VARINT_AND_CHECK(buf, pos, size, res) \
-  { const unsigned s = Xz_ReadVarInt(buf + pos, size - pos, res); \
+  { unsigned s = Xz_ReadVarInt(buf + pos, size - pos, res); \
   if (s == 0) return SZ_ERROR_ARCHIVE; \
   pos += s; }
 
@@ -1034,7 +1034,7 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
       SRes res;
 
       ECoderFinishMode finishMode2 = finishMode;
-      BoolInt srcFinished2 = (BoolInt)srcFinished;
+      BoolInt srcFinished2 = srcFinished;
       BoolInt destFinish = False;
 
       if (p->block.packSize != (UInt64)(Int64)-1)
@@ -1127,7 +1127,7 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
       return SZ_OK;
     }
 
-    switch ((int)p->state)
+    switch (p->state)
     {
       case XZ_STATE_STREAM_HEADER:
       {
@@ -1172,15 +1172,15 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
             p->state = XZ_STATE_STREAM_INDEX;
             break;
           }
-          p->blockHeaderSize = ((unsigned)p->buf[0] << 2) + 4;
+          p->blockHeaderSize = ((UInt32)p->buf[0] << 2) + 4;
           break;
         }
         
         if (p->pos != p->blockHeaderSize)
         {
-          unsigned cur = p->blockHeaderSize - p->pos;
+          UInt32 cur = p->blockHeaderSize - p->pos;
           if (cur > srcRem)
-            cur = (unsigned)srcRem;
+            cur = (UInt32)srcRem;
           memcpy(p->buf + p->pos, src, cur);
           p->pos += cur;
           (*srcLen) += cur;
@@ -1222,8 +1222,8 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
         }
         else
         {
-          const unsigned checkSize = XzFlags_GetCheckSize(p->streamFlags);
-          unsigned cur = checkSize - p->pos;
+          UInt32 checkSize = XzFlags_GetCheckSize(p->streamFlags);
+          UInt32 cur = checkSize - p->pos;
           if (cur != 0)
           {
             if (srcRem == 0)
@@ -1232,7 +1232,7 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
               return SZ_OK;
             }
             if (cur > srcRem)
-              cur = (unsigned)srcRem;
+              cur = (UInt32)srcRem;
             memcpy(p->buf + p->pos, src, cur);
             p->pos += cur;
             (*srcLen) += cur;
@@ -1321,9 +1321,9 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
 
       case XZ_STATE_STREAM_FOOTER:
       {
-        unsigned cur = XZ_STREAM_FOOTER_SIZE - p->pos;
+        UInt32 cur = XZ_STREAM_FOOTER_SIZE - p->pos;
         if (cur > srcRem)
-          cur = (unsigned)srcRem;
+          cur = (UInt32)srcRem;
         memcpy(p->buf + p->pos, src, cur);
         p->pos += cur;
         (*srcLen) += cur;
@@ -1358,8 +1358,6 @@ SRes XzUnpacker_Code(CXzUnpacker *p, Byte *dest, SizeT *destLen,
       }
       
       case XZ_STATE_BLOCK: break; /* to disable GCC warning */
-      
-      default: return SZ_ERROR_FAIL;
     }
   }
   /*
@@ -1775,10 +1773,10 @@ static void XzDecMt_Callback_Parse(void *obj, unsigned coderIndex, CMtDecCallbac
           }
         }
         {
-        const UInt64 packSize = block->packSize;
-        const UInt64 packSizeAligned = packSize + ((0 - (unsigned)packSize) & 3);
-        const unsigned checkSize = XzFlags_GetCheckSize(coder->dec.streamFlags);
-        const UInt64 blockPackSum = coder->inPreSize + packSizeAligned + checkSize;
+        UInt64 packSize = block->packSize;
+        UInt64 packSizeAligned = packSize + ((0 - (unsigned)packSize) & 3);
+        UInt32 checkSize = XzFlags_GetCheckSize(coder->dec.streamFlags);
+        UInt64 blockPackSum = coder->inPreSize + packSizeAligned + checkSize;
         // if (blockPackSum <= me->props.inBlockMax)
         // unpackBlockMaxSize
         {
@@ -2383,7 +2381,7 @@ static SRes XzDecMt_Decode_ST(CXzDecMt *p
   if (tMode)
   {
     XzDecMt_FreeOutBufs(p);
-    tMode = (BoolInt)MtDec_PrepareRead(&p->mtc);
+    tMode = MtDec_PrepareRead(&p->mtc);
   }
   #endif
 
@@ -2646,7 +2644,7 @@ SRes XzDecMt_Decode(CXzDecMtHandle p,
     p->outSize = *outDataSize;
   }
 
-  p->finishMode = (BoolInt)finishMode;
+  p->finishMode = finishMode;
 
   // p->outSize = 457; p->outSize_Defined = True; p->finishMode = False; // for test
 

@@ -42,7 +42,7 @@ static void AddValuePair(UString &s, UINT resourceID, UInt64 value, bool addColo
 {
   AddLangString(s, resourceID);
   if (addColon)
-    s.Add_Colon();
+    s += ':';
   s.Add_Space();
   s.Add_UInt64(value);
   s.Add_LF();

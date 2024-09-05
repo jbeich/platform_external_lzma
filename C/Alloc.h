@@ -1,5 +1,5 @@
 /* Alloc.h -- Memory allocation functions
-2024-01-22 : Igor Pavlov : Public domain */
+2023-03-04 : Igor Pavlov : Public domain */
 
 #ifndef ZIP7_INC_ALLOC_H
 #define ZIP7_INC_ALLOC_H
@@ -22,9 +22,6 @@ void *MyAlloc(size_t size);
 void MyFree(void *address);
 void *MyRealloc(void *address, size_t size);
 
-void *z7_AlignedAlloc(size_t size);
-void  z7_AlignedFree(void *p);
-
 #ifdef _WIN32
 
 #ifdef Z7_LARGE_PAGES
@@ -36,14 +33,12 @@ void MidFree(void *address);
 void *BigAlloc(size_t size);
 void BigFree(void *address);
 
-/* #define Z7_BIG_ALLOC_IS_ZERO_FILLED */
-
 #else
 
-#define MidAlloc(size)    z7_AlignedAlloc(size)
-#define MidFree(address)  z7_AlignedFree(address)
-#define BigAlloc(size)    z7_AlignedAlloc(size)
-#define BigFree(address)  z7_AlignedFree(address)
+#define MidAlloc(size) MyAlloc(size)
+#define MidFree(address) MyFree(address)
+#define BigAlloc(size) MyAlloc(size)
+#define BigFree(address) MyFree(address)
 
 #endif
 

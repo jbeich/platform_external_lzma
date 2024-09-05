@@ -18,7 +18,6 @@ SRes HRESULT_To_SRes(HRESULT res, SRes defaultRes) throw()
     case E_ABORT: return SZ_ERROR_PROGRESS;
     case S_FALSE: return SZ_ERROR_DATA;
     case E_NOTIMPL: return SZ_ERROR_UNSUPPORTED;
-    default: break;
   }
   return defaultRes;
 }
@@ -33,8 +32,6 @@ HRESULT SResToHRESULT(SRes res) throw()
     case SZ_ERROR_DATA:
     case SZ_ERROR_CRC:
     case SZ_ERROR_INPUT_EOF:
-    case SZ_ERROR_ARCHIVE:
-    case SZ_ERROR_NO_ARCHIVE:
       return S_FALSE;
     
     case SZ_ERROR_MEM: return E_OUTOFMEMORY;
@@ -48,7 +45,6 @@ HRESULT SResToHRESULT(SRes res) throw()
     // case SZ_ERROR_ARCHIVE:
     // case SZ_ERROR_NO_ARCHIVE:
     // return E_FAIL;
-    default: break;
   }
   if (res < 0)
     return res;

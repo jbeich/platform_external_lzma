@@ -168,10 +168,6 @@ SOURCE=..\..\..\Windows\PropVariantConv.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\..\Windows\TimeUtils.cpp
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\..\Windows\TimeUtils.h
 # End Source File
 # End Group

@@ -12,11 +12,11 @@
 
 #include "Random.h"
 
-void CRandom::Init(unsigned seed) { srand(seed); }
+void CRandom::Init(unsigned int seed) { srand(seed); }
 
 void CRandom::Init()
 {
-  Init((unsigned)
+  Init((unsigned int)
     #ifdef _WIN32
     GetTickCount()
     #else

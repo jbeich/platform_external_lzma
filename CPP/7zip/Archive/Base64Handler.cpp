@@ -369,15 +369,18 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
       _data.Alloc(kStartSize);
       size_t size = kStartSize;
       RINOK(ReadStream(stream, _data, &size))
-      if (IsArc_Base64(_data, size) == k_IsArc_Res_NO)
+      UInt32 isArcRes = IsArc_Base64(_data, size);
+      if (isArcRes == k_IsArc_Res_NO)
         return S_FALSE;
     }
     _isArc = true;
 
     UInt64 packSize64;
     RINOK(InStream_GetSize_SeekToEnd(stream, packSize64))
+
     if (packSize64 == 0)
       return S_FALSE;
+
     size_t curSize = 1 << 16;
     if (curSize > packSize64)
       curSize = (size_t)packSize64;
@@ -444,24 +447,35 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     return E_INVALIDARG;
 
   RINOK(extractCallback->SetTotal(_size))
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
-  // RINOK(lps->SetCur())
-  Int32 opRes;
+
   {
+    lps->InSize = lps->OutSize = 0;
+    RINOK(lps->SetCur())
+
     CMyComPtr<ISequentialOutStream> realOutStream;
     const Int32 askMode = testMode ?
         NExtract::NAskMode::kTest :
         NExtract::NAskMode::kExtract;
+    
     RINOK(extractCallback->GetStream(0, &realOutStream, askMode))
+    
     if (!testMode && !realOutStream)
       return S_OK;
-    RINOK(extractCallback->PrepareOperation(askMode))
+
+    extractCallback->PrepareOperation(askMode);
+
     if (realOutStream)
     {
       RINOK(WriteStream(realOutStream, (const Byte *)_data, _size))
+      realOutStream.Release();
     }
-    opRes = NExtract::NOperationResult::kOK;
+  
+    Int32 opRes = NExtract::NOperationResult::kOK;
+
     if (_sres != k_Base64_RES_Finished)
     {
       if (_sres == k_Base64_RES_NeedMoreInput)
@@ -469,11 +483,14 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
       else if (_sres == k_Base64_RES_UnexpectedChar)
         opRes = NExtract::NOperationResult::kDataError;
     }
+
+    RINOK(extractCallback->SetOperationResult(opRes))
   }
-  RINOK(extractCallback->SetOperationResult(opRes))
+  
   lps->InSize = _phySize;
   lps->OutSize = _size;
   return lps->SetCur();
+
   COM_TRY_END
 }
 

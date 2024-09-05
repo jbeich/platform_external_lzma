@@ -27,6 +27,7 @@ bool IsEndSig(const Byte *p) throw();
 bool IsBlockSig(const Byte *p) throw();
 
 const unsigned kNumTableBits = 9;
+const unsigned kNumBitsMax = kMaxHuffmanLen;
 
 typedef NHuffman::CDecoder<kMaxHuffmanLen, kMaxAlphaSize, kNumTableBits> CHuffmanDecoder;
 
@@ -98,7 +99,7 @@ struct CBase: public CBitDecoder
   UInt32 blockSizeMax;
 
   unsigned state;
-  UInt32 state2;
+  unsigned state2;
   unsigned state3;
   unsigned state4;
   unsigned state5;

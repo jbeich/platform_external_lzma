@@ -254,8 +254,8 @@ LONG CKey::QueryValue(LPCTSTR name, CSysString &value)
 {
   value.Empty();
   DWORD type = 0;
-  DWORD curSize = 0;
-  LONG res = RegQueryValueEx(_object, name, NULL, &type, NULL, &curSize);
+  UInt32 curSize = 0;
+  LONG res = RegQueryValueEx(_object, name, NULL, &type, NULL, (DWORD *)&curSize);
   if (res != ERROR_SUCCESS && res != ERROR_MORE_DATA)
     return res;
   UInt32 curSize2 = curSize;
@@ -281,11 +281,13 @@ LONG CKey::QueryValue(LPCWSTR name, UString &value)
 {
   value.Empty();
   DWORD type = 0;
-  DWORD curSize = 0;
+  UInt32 curSize = 0;
+
   LONG res;
+
   if (g_IsNT)
   {
-    res = RegQueryValueExW(_object, name, NULL, &type, NULL, &curSize);
+    res = RegQueryValueExW(_object, name, NULL, &type, NULL, (DWORD *)&curSize);
     if (res != ERROR_SUCCESS && res != ERROR_MORE_DATA)
       return res;
     UInt32 curSize2 = curSize;
@@ -300,6 +302,7 @@ LONG CKey::QueryValue(LPCWSTR name, UString &value)
     res = QueryValue(name == 0 ? 0 : (LPCSTR)GetSystemString(name), vTemp);
     value = GetUnicodeString(vTemp);
   }
+  
   return res;
 }
 
@@ -374,7 +377,7 @@ LONG CKey::GetValue_Strings(LPCTSTR valueName, UStringVector &strings)
   strings.Clear();
   CByteBuffer buffer;
   UInt32 dataSize = 0;
-  const LONG res = QueryValue(valueName, buffer, dataSize);
+  LONG res = QueryValue(valueName, buffer, dataSize);
   if (res != ERROR_SUCCESS)
     return res;
   if (dataSize > buffer.Size())
@@ -383,7 +386,7 @@ LONG CKey::GetValue_Strings(LPCTSTR valueName, UStringVector &strings)
     return E_FAIL;
 
   const wchar_t *data = (const wchar_t *)(const void *)(const Byte  *)buffer;
-  const size_t numChars = dataSize / sizeof(wchar_t);
+  size_t numChars = dataSize / sizeof(wchar_t);
   size_t prev = 0;
   UString s;
   

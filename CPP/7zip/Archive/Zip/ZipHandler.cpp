@@ -18,15 +18,22 @@
 #include "../../Common/StreamUtils.h"
 
 #include "../../Compress/CopyCoder.h"
-#ifndef Z7_ZIP_LZFSE_DISABLE
+
+#ifdef Z7_EXTERNAL_CODECS
+#ifndef SUPPORT_LZFSE
+#define SUPPORT_LZFSE
+#endif
+#endif
+
+#ifdef SUPPORT_LZFSE
 #include "../../Compress/LzfseDecoder.h"
 #endif
+
 #include "../../Compress/LzmaDecoder.h"
 #include "../../Compress/ImplodeDecoder.h"
 #include "../../Compress/PpmdZip.h"
 #include "../../Compress/ShrinkDecoder.h"
 #include "../../Compress/XzDecoder.h"
-#include "../../Compress/ZstdDecoder.h"
 
 #include "../../Crypto/WzAes.h"
 #include "../../Crypto/ZipCrypto.h"
@@ -334,7 +341,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
     }
 
     // case kpidIsAltStream: prop = true; break;
-    default: break;
   }
   return prop.Detach(value);
   COM_TRY_END
@@ -540,7 +546,7 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
             else
             {
               m += kMethod_StrongCrypto;
-              m.Add_Colon();
+              m += ':';
               m.Add_UInt32(f.AlgId);
             }
             if (f.CertificateIsUsed())
@@ -561,7 +567,7 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
           s = kMethodNames1[id];
         else
         {
-          const int id2 = (int)id - (int)kMethodNames2Start;
+          int id2 = (int)id - (int)kMethodNames2Start;
           if (id2 >= 0 && (unsigned)id2 < kNumMethodNames2)
             s = kMethodNames2[id2];
         }
@@ -582,7 +588,7 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
           }
           else if (id == NFileHeader::NCompressionMethod::kDeflate)
           {
-            m.Add_Colon();
+            m += ':';
             m += kDeflateLevels[level];
             level = 0;
           }
@@ -678,7 +684,6 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
       }
       break;
     */
-    default: break;
   }
   
   return prop.Detach(value);
@@ -803,8 +808,17 @@ Z7_CLASS_IMP_NOQIB_3(
   , ICompressGetInStreamProcessedSize
 )
 public:
-  CMyComPtr2_Create<ICompressCoder, NCompress::NLzma::CDecoder> Decoder;
+  NCompress::NLzma::CDecoder *DecoderSpec;
+  CMyComPtr<ICompressCoder> Decoder;
+
+  CLzmaDecoder();
 };
+
+CLzmaDecoder::CLzmaDecoder()
+{
+  DecoderSpec = new NCompress::NLzma::CDecoder;
+  Decoder = DecoderSpec;
+}
 
 static const unsigned kZipLzmaPropsSize = 4 + LZMA_PROPS_SIZE;
 
@@ -815,7 +829,7 @@ Z7_COM7F_IMF(CLzmaDecoder::Code(ISequentialInStream *inStream, ISequentialOutStr
   RINOK(ReadStream_FALSE(inStream, buf, kZipLzmaPropsSize))
   if (buf[2] != LZMA_PROPS_SIZE || buf[3] != 0)
     return E_NOTIMPL;
-  RINOK(Decoder->SetDecoderProperties2(buf + 4, LZMA_PROPS_SIZE))
+  RINOK(DecoderSpec->SetDecoderProperties2(buf + 4, LZMA_PROPS_SIZE))
   UInt64 inSize2 = 0;
   if (inSize)
   {
@@ -824,18 +838,18 @@ Z7_COM7F_IMF(CLzmaDecoder::Code(ISequentialInStream *inStream, ISequentialOutStr
       return S_FALSE;
     inSize2 -= kZipLzmaPropsSize;
   }
-  return Decoder.Interface()->Code(inStream, outStream, inSize ? &inSize2 : NULL, outSize, progress);
+  return Decoder->Code(inStream, outStream, inSize ? &inSize2 : NULL, outSize, progress);
 }
 
 Z7_COM7F_IMF(CLzmaDecoder::SetFinishMode(UInt32 finishMode))
 {
-  Decoder->FinishStream = (finishMode != 0);
+  DecoderSpec->FinishStream = (finishMode != 0);
   return S_OK;
 }
 
 Z7_COM7F_IMF(CLzmaDecoder::GetInStreamProcessedSize(UInt64 *value))
 {
-  *value = Decoder->GetInputProcessedSize() + kZipLzmaPropsSize;
+  *value = DecoderSpec->GetInputProcessedSize() + kZipLzmaPropsSize;
   return S_OK;
 }
 
@@ -855,17 +869,26 @@ struct CMethodItem
 
 class CZipDecoder
 {
-  CMyComPtr2<ICompressFilter, NCrypto::NZip::CDecoder> _zipCryptoDecoder;
-  CMyComPtr2<ICompressFilter, NCrypto::NZipStrong::CDecoder> _pkAesDecoder;
-  CMyComPtr2<ICompressFilter, NCrypto::NWzAes::CDecoder> _wzAesDecoder;
+  NCrypto::NZip::CDecoder *_zipCryptoDecoderSpec;
+  NCrypto::NZipStrong::CDecoder *_pkAesDecoderSpec;
+  NCrypto::NWzAes::CDecoder *_wzAesDecoderSpec;
 
-  CMyComPtr2<ISequentialInStream, CFilterCoder> filterStream;
+  CMyComPtr<ICompressFilter> _zipCryptoDecoder;
+  CMyComPtr<ICompressFilter> _pkAesDecoder;
+  CMyComPtr<ICompressFilter> _wzAesDecoder;
+
+  CFilterCoder *filterStreamSpec;
+  CMyComPtr<ISequentialInStream> filterStream;
   CMyComPtr<ICryptoGetTextPassword> getTextPassword;
   CObjectVector<CMethodItem> methodItems;
 
   CLzmaDecoder *lzmaDecoderSpec;
 public:
   CZipDecoder():
+      _zipCryptoDecoderSpec(NULL),
+      _pkAesDecoderSpec(NULL),
+      _wzAesDecoderSpec(NULL),
+      filterStreamSpec(NULL),
       lzmaDecoderSpec(NULL)
     {}
 
@@ -1028,12 +1051,15 @@ HRESULT CZipDecoder::Decode(
     }
   }
 
-  CMyComPtr2_Create<ISequentialOutStream, COutStreamWithCRC> outStream;
-  outStream->SetStream(realOutStream);
-  outStream->Init(needCRC);
+  COutStreamWithCRC *outStreamSpec = new COutStreamWithCRC;
+  CMyComPtr<ISequentialOutStream> outStream = outStreamSpec;
+  outStreamSpec->SetStream(realOutStream);
+  outStreamSpec->Init(needCRC);
   
   CMyComPtr<ISequentialInStream> packStream;
-  CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> inStream;
+
+  CLimitedSequentialInStream *limitedStreamSpec = new CLimitedSequentialInStream;
+  CMyComPtr<ISequentialInStream> inStream(limitedStreamSpec);
 
   {
     UInt64 packSize = item.PackSize;
@@ -1049,8 +1075,8 @@ HRESULT CZipDecoder::Decode(
       res = NExtract::NOperationResult::kUnavailable;
       return S_OK;
     }
-    inStream->SetStream(packStream);
-    inStream->Init(packSize);
+    limitedStreamSpec->SetStream(packStream);
+    limitedStreamSpec->Init(packSize);
   }
 
   
@@ -1063,9 +1089,13 @@ HRESULT CZipDecoder::Decode(
     if (wzAesMode)
     {
       id = aesField.Method;
-      _wzAesDecoder.Create_if_Empty();
+      if (!_wzAesDecoder)
+      {
+        _wzAesDecoderSpec = new NCrypto::NWzAes::CDecoder;
+        _wzAesDecoder = _wzAesDecoderSpec;
+      }
       cryptoFilter = _wzAesDecoder;
-      if (!_wzAesDecoder->SetKeyMode(aesField.Strength))
+      if (!_wzAesDecoderSpec->SetKeyMode(aesField.Strength))
       {
         res = NExtract::NOperationResult::kUnsupportedMethod;
         return S_OK;
@@ -1073,12 +1103,20 @@ HRESULT CZipDecoder::Decode(
     }
     else if (pkAesMode)
     {
-      _pkAesDecoder.Create_if_Empty();
+      if (!_pkAesDecoder)
+      {
+        _pkAesDecoderSpec = new NCrypto::NZipStrong::CDecoder;
+        _pkAesDecoder = _pkAesDecoderSpec;
+      }
       cryptoFilter = _pkAesDecoder;
     }
     else
     {
-      _zipCryptoDecoder.Create_if_Empty();
+      if (!_zipCryptoDecoder)
+      {
+        _zipCryptoDecoderSpec = new NCrypto::NZip::CDecoder;
+        _zipCryptoDecoder = _zipCryptoDecoderSpec;
+      }
       cryptoFilter = _zipCryptoDecoder;
     }
     
@@ -1097,17 +1135,15 @@ HRESULT CZipDecoder::Decode(
       AString_Wipe charPassword;
       if (password)
       {
-#if 0 && defined(_WIN32)
-        // do we need UTF-8 passwords here ?
-        if (item.GetHostOS() == NFileHeader::NHostOS::kUnix // 24.05
-            // || item.IsUtf8() // 22.00
-            )
+        /*
+        // 22.00: do we need UTF-8 passwords here ?
+        if (item.IsUtf8()) // 22.00
         {
           // throw 1;
           ConvertUnicodeToUTF8((LPCOLESTR)password, charPassword);
         }
         else
-#endif
+        */
         {
           UnicodeStringToMultiByte2(charPassword, (LPCOLESTR)password, CP_ACP);
         }
@@ -1166,12 +1202,10 @@ HRESULT CZipDecoder::Decode(
       mi.Coder = new NCompress::NXz::CComDecoder;
     else if (id == NFileHeader::NCompressionMethod::kPPMd)
       mi.Coder = new NCompress::NPpmdZip::CDecoder(true);
-    else if (id == NFileHeader::NCompressionMethod::kZstdWz)
-      mi.Coder = new NCompress::NZstd::CDecoder();
-#ifndef Z7_ZIP_LZFSE_DISABLE
+    #ifdef SUPPORT_LZFSE
     else if (id == NFileHeader::NCompressionMethod::kWzAES)
       mi.Coder = new NCompress::NLzfse::CDecoder;
-#endif
+    #endif
     else
     {
       CMethodId szMethodID;
@@ -1254,18 +1288,21 @@ HRESULT CZipDecoder::Decode(
     HRESULT result = S_OK;
     if (item.IsEncrypted())
     {
-      if (!filterStream.IsDefined())
-        filterStream.SetFromCls(new CFilterCoder(false));
+      if (!filterStream)
+      {
+        filterStreamSpec = new CFilterCoder(false);
+        filterStream = filterStreamSpec;
+      }
      
-      filterReleaser.FilterCoder = filterStream.ClsPtr();
-      filterStream->Filter = cryptoFilter;
+      filterReleaser.FilterCoder = filterStreamSpec;
+      filterStreamSpec->Filter = cryptoFilter;
       
       if (wzAesMode)
       {
-        result = _wzAesDecoder->ReadHeader(inStream);
+        result = _wzAesDecoderSpec->ReadHeader(inStream);
         if (result == S_OK)
         {
-          if (!_wzAesDecoder->Init_and_CheckPassword())
+          if (!_wzAesDecoderSpec->Init_and_CheckPassword())
           {
             res = NExtract::NOperationResult::kWrongPassword;
             return S_OK;
@@ -1275,11 +1312,11 @@ HRESULT CZipDecoder::Decode(
       else if (pkAesMode)
       {
         isFullStreamExpected = false;
-        result = _pkAesDecoder->ReadHeader(inStream, item.Crc, item.Size);
+        result =_pkAesDecoderSpec->ReadHeader(inStream, item.Crc, item.Size);
         if (result == S_OK)
         {
           bool passwOK;
-          result = _pkAesDecoder->Init_and_CheckPassword(passwOK);
+          result = _pkAesDecoderSpec->Init_and_CheckPassword(passwOK);
           if (result == S_OK && !passwOK)
           {
             res = NExtract::NOperationResult::kWrongPassword;
@@ -1289,10 +1326,10 @@ HRESULT CZipDecoder::Decode(
       }
       else
       {
-        result = _zipCryptoDecoder->ReadHeader(inStream);
+        result = _zipCryptoDecoderSpec->ReadHeader(inStream);
         if (result == S_OK)
         {
-          _zipCryptoDecoder->Init_BeforeDecode();
+          _zipCryptoDecoderSpec->Init_BeforeDecode();
           
           /* Info-ZIP modification to ZipCrypto format:
                if bit 3 of the general purpose bit flag is set,
@@ -1300,10 +1337,10 @@ HRESULT CZipDecoder::Decode(
              Info-ZIP code probably writes 2 bytes of File Time.
              We check only 1 byte. */
 
-          // UInt32 v1 = GetUi16(_zipCryptoDecoder->_header + NCrypto::NZip::kHeaderSize - 2);
+          // UInt32 v1 = GetUi16(_zipCryptoDecoderSpec->_header + NCrypto::NZip::kHeaderSize - 2);
           // UInt32 v2 = (item.HasDescriptor() ? (item.Time & 0xFFFF) : (item.Crc >> 16));
 
-          Byte v1 = _zipCryptoDecoder->_header[NCrypto::NZip::kHeaderSize - 1];
+          Byte v1 = _zipCryptoDecoderSpec->_header[NCrypto::NZip::kHeaderSize - 1];
           Byte v2 = (Byte)(item.HasDescriptor() ? (item.Time >> 8) : (item.Crc >> 24));
 
           if (v1 != v2)
@@ -1324,7 +1361,7 @@ HRESULT CZipDecoder::Decode(
         RINOK(setFinishMode->SetFinishMode(BoolToUInt(true)))
       }
       
-      const UInt64 coderPackSize = inStream->GetRem();
+      const UInt64 coderPackSize = limitedStreamSpec->GetRem();
 
       if (id == NFileHeader::NCompressionMethod::kStore && item.IsEncrypted())
       {
@@ -1340,7 +1377,7 @@ HRESULT CZipDecoder::Decode(
         {
           padStreamSpec = new COutStreamWithPadPKCS7;
           padStream = padStreamSpec;
-          padSize = _pkAesDecoder->GetPadSize((UInt32)item.Size);
+          padSize = _pkAesDecoderSpec->GetPadSize((UInt32)item.Size);
           padStreamSpec->SetStream(outStream);
           padStreamSpec->Init(item.Size, padSize);
         }
@@ -1357,12 +1394,12 @@ HRESULT CZipDecoder::Decode(
             size = expectedSize;
         }
 
-        result = filterStream->Code(inStream, padStream ?
-            padStream.Interface() :
-            outStream.Interface(),
+        result = filterStreamSpec->Code(inStream, padStream ?
+            (ISequentialOutStream *)padStream :
+            (ISequentialOutStream *)outStream,
             NULL, &size, compressProgress);
 
-        if (outStream->GetSize() != item.Size)
+        if (outStreamSpec->GetSize() != item.Size)
           truncatedError = true;
 
         if (pkAesMode)
@@ -1378,20 +1415,20 @@ HRESULT CZipDecoder::Decode(
         if (item.IsEncrypted())
         {
           readFromFilter = true;
-          inStreamReleaser.FilterCoder = filterStream.ClsPtr();
-          RINOK(filterStream->SetInStream(inStream))
+          inStreamReleaser.FilterCoder = filterStreamSpec;
+          RINOK(filterStreamSpec->SetInStream(inStream))
           
           /* IFilter::Init() does nothing in all zip crypto filters.
           So we can call any Initialize function in CFilterCoder. */
           
-          RINOK(filterStream->Init_NoSubFilterInit())
-          // RINOK(filterStream->SetOutStreamSize(NULL));
+          RINOK(filterStreamSpec->Init_NoSubFilterInit())
+          // RINOK(filterStreamSpec->SetOutStreamSize(NULL));
         }
 
         try {
         result = coder->Code(readFromFilter ?
-              filterStream.Interface() :
-              inStream.Interface(),
+              (ISequentialInStream *)filterStream :
+              (ISequentialInStream *)inStream,
             outStream,
             isFullStreamExpected ? &coderPackSize : NULL,
             // NULL,
@@ -1411,7 +1448,7 @@ HRESULT CZipDecoder::Decode(
           {
             if (pkAesMode)
             {
-              const UInt32 padSize = _pkAesDecoder->GetPadSize((UInt32)processed);
+              const UInt32 padSize = _pkAesDecoderSpec->GetPadSize((UInt32)processed);
               if (processed + padSize > coderPackSize)
                 truncatedError = true;
               else if (processed + padSize < coderPackSize)
@@ -1477,7 +1514,7 @@ HRESULT CZipDecoder::Decode(
       }
 
       if (result == S_OK && id == NFileHeader::NCompressionMethod::kLZMA)
-        if (!lzmaDecoderSpec->Decoder->CheckFinishStatus(item.IsLzmaEOS()))
+        if (!lzmaDecoderSpec->DecoderSpec->CheckFinishStatus(item.IsLzmaEOS()))
           lzmaEosError = true;
     }
     
@@ -1496,32 +1533,32 @@ HRESULT CZipDecoder::Decode(
   bool crcOK = true;
   bool authOk = true;
   if (needCRC)
-    crcOK = (outStream->GetCRC() == item.Crc);
+    crcOK = (outStreamSpec->GetCRC() == item.Crc);
 
   if (useUnpackLimit)
-    if (outStream->GetSize() != item.Size)
+    if (outStreamSpec->GetSize() != item.Size)
       truncatedError = true;
   
   if (wzAesMode)
   {
-    const UInt64 unpackSize = outStream->GetSize();
-    const UInt64 packSize = inStream->GetSize();
+    const UInt64 unpackSize = outStreamSpec->GetSize();
+    const UInt64 packSize = limitedStreamSpec->GetSize();
     bool thereAreData = false;
     // read to the end from filter or from packed stream
     if (SkipStreamData(readFromFilter ?
-          filterStream.Interface() :
-          inStream.Interface(),
+          (ISequentialInStream *)filterStream :
+          (ISequentialInStream *)inStream,
         compressProgress, packSize, unpackSize, thereAreData) != S_OK)
       authOk = false;
     if (needReminderCheck && thereAreData)
       dataAfterEnd = true;
 
-    if (inStream->GetRem() != 0)
+    if (limitedStreamSpec->GetRem() != 0)
       truncatedError = true;
     else
     {
-      inStream->Init(NCrypto::NWzAes::kMacSize);
-      if (_wzAesDecoder->CheckMac(inStream, authOk) != S_OK)
+      limitedStreamSpec->Init(NCrypto::NWzAes::kMacSize);
+      if (_wzAesDecoderSpec->CheckMac(inStream, authOk) != S_OK)
         authOk = false;
     }
   }
@@ -1580,7 +1617,8 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   CZipDecoder myDecoder;
   UInt64 cur_Unpacked, cur_Packed;
   
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
 
   for (i = 0;; i++,
@@ -1602,8 +1640,6 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
         NExtract::NAskMode::kTest :
         NExtract::NAskMode::kExtract;
 
-    Int32 opRes;
-    {
     CMyComPtr<ISequentialOutStream> realOutStream;
     RINOK(extractCallback->GetStream(index, &realOutStream, askMode))
 
@@ -1653,24 +1689,25 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
 
     RINOK(extractCallback->PrepareOperation(askMode))
 
+    Int32 res;
     const HRESULT hres = myDecoder.Decode(
         EXTERNAL_CODECS_VARS
         m_Archive, item, realOutStream, extractCallback,
-        lps,
+        progress,
         #ifndef Z7_ST
         _props._numThreads, _props._memUsage_Decompress,
         #endif
-        opRes);
+        res);
     
     RINOK(hres)
-    // realOutStream.Release();
+    realOutStream.Release();
     
-    if (opRes == NExtract::NOperationResult::kOK && headersError)
-      opRes = NExtract::NOperationResult::kHeadersError;
-    }
-    RINOK(extractCallback->SetOperationResult(opRes))
-  }
+    if (res == NExtract::NOperationResult::kOK && headersError)
+      res = NExtract::NOperationResult::kHeadersError;
 
+    RINOK(extractCallback->SetOperationResult(res))
+  }
+  
   COM_TRY_END
 }
 

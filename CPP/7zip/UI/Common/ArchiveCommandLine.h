@@ -65,7 +65,6 @@ struct CArcCmdLineOptions
   bool ShowDialog;
   bool TechMode;
   bool ShowTime;
-  CBoolPair ListPathSeparatorSlash;
 
   CBoolPair NtSecurity;
   CBoolPair AltStreams;
@@ -146,12 +145,6 @@ struct CArcCmdLineOptions
 
       LogLevel(0)
   {
-    ListPathSeparatorSlash.Val =
-#ifdef _WIN32
-        false;
-#else
-        true;
-#endif
   }
 };
 

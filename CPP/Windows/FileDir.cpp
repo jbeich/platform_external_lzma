@@ -37,12 +37,7 @@ static bool FiTime_To_timespec(const CFiTime *ft, timespec &ts)
 {
   if (ft)
   {
-#if defined(_AIX)
-    ts.tv_sec  = ft->tv_sec;
-    ts.tv_nsec = ft->tv_nsec;
-#else
     ts = *ft;
-#endif
     return true;
   }
   // else
@@ -251,11 +246,6 @@ bool MyMoveFile(CFSTR oldFile, CFSTR newFile)
 }
 
 #ifndef UNDER_CE
-#if !defined(Z7_WIN32_WINNT_MIN) || Z7_WIN32_WINNT_MIN < 0x0500  // Win2000
-#define Z7_USE_DYN_CreateHardLink
-#endif
-
-#ifdef Z7_USE_DYN_CreateHardLink
 EXTERN_C_BEGIN
 typedef BOOL (WINAPI *Func_CreateHardLinkW)(
     LPCWSTR lpFileName,
@@ -263,7 +253,6 @@ typedef BOOL (WINAPI *Func_CreateHardLinkW)(
     LPSECURITY_ATTRIBUTES lpSecurityAttributes
     );
 EXTERN_C_END
-#endif
 #endif // UNDER_CE
 
 bool MyCreateHardLink(CFSTR newFileName, CFSTR existFileName)
@@ -281,7 +270,6 @@ bool MyCreateHardLink(CFSTR newFileName, CFSTR existFileName)
   else
   #endif
   {
-#ifdef Z7_USE_DYN_CreateHardLink
     const
     Func_CreateHardLinkW
       my_CreateHardLinkW = Z7_GET_PROC_ADDRESS(
@@ -289,13 +277,9 @@ bool MyCreateHardLink(CFSTR newFileName, CFSTR existFileName)
         "CreateHardLinkW");
     if (!my_CreateHardLinkW)
       return false;
-    #define MY_CreateHardLinkW  my_CreateHardLinkW
-#else
-    #define MY_CreateHardLinkW  CreateHardLinkW
-#endif
     IF_USE_MAIN_PATH_2(newFileName, existFileName)
     {
-      if (MY_CreateHardLinkW(fs2us(newFileName), fs2us(existFileName), NULL))
+      if (my_CreateHardLinkW(fs2us(newFileName), fs2us(existFileName), NULL))
         return true;
     }
     #ifdef Z7_LONG_PATH
@@ -303,7 +287,7 @@ bool MyCreateHardLink(CFSTR newFileName, CFSTR existFileName)
     {
       UString d1, d2;
       if (GetSuperPaths(newFileName, existFileName, d1, d2, USE_MAIN_PATH_2))
-        return BOOLToBool(MY_CreateHardLinkW(d1, d2, NULL));
+        return BOOLToBool(my_CreateHardLinkW(d1, d2, NULL));
     }
     #endif
   }
@@ -796,7 +780,7 @@ bool CreateTempFile2(CFSTR prefix, bool addRandom, AString &postfix, NIO::COutFi
       unsigned k;
       for (k = 0; k < 8; k++)
       {
-        const unsigned t = (unsigned)val & 0xF;
+        const unsigned t = val & 0xF;
         val >>= 4;
         s[k] = (char)((t < 10) ? ('0' + t) : ('A' + (t - 10)));
       }
@@ -821,7 +805,7 @@ bool CreateTempFile2(CFSTR prefix, bool addRandom, AString &postfix, NIO::COutFi
     }
     if (outFile)
     {
-      if (outFile->Create_NEW(path))
+      if (outFile->Create(path, false))
         return true;
     }
     else
@@ -944,7 +928,7 @@ bool RemoveDir(CFSTR path)
 static BOOL My_CopyFile(CFSTR oldFile, CFSTR newFile)
 {
   NWindows::NFile::NIO::COutFile outFile;
-  if (!outFile.Create_NEW(newFile))
+  if (!outFile.Create(newFile, false))
     return FALSE;
   
   NWindows::NFile::NIO::CInFile inFile;

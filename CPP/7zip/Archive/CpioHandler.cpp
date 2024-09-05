@@ -30,6 +30,8 @@ namespace NCpio {
 static const Byte kMagicBin0 = 0xC7;
 static const Byte kMagicBin1 = 0x71;
 
+// #define MAGIC_ASCII { '0', '7', '0', '7', '0' }
+
 static const Byte kMagicHex    = '1'; // New ASCII Format
 static const Byte kMagicHexCrc = '2'; // New CRC Format
 static const Byte kMagicOct    = '7'; // Portable ASCII Format
@@ -145,8 +147,8 @@ static bool CheckOctRecord(const Byte *p)
 {
   for (unsigned i = 6; i < k_OctRecord_Size; i++)
   {
-    const unsigned c = (unsigned)p[i] - '0';
-    if (c > 7)
+    const Byte c = p[i];
+    if (c < '0' || c > '7')
       return false;
   }
   return true;
@@ -156,15 +158,11 @@ static bool CheckHexRecord(const Byte *p)
 {
   for (unsigned i = 6; i < k_HexRecord_Size; i++)
   {
-    unsigned c = p[i];
-    c -= '0';
-    if (c > 9)
-    {
-      c -= 'A' - '0';
-      c &= ~0x20u;
-      if (c > 5)
-        return false;
-    }
+    const Byte c = p[i];
+    if ((c < '0' || c > '9') &&
+        (c < 'A' || c > 'F') &&
+        (c < 'a' || c > 'f'))
+      return false;
   }
   return true;
 }
@@ -216,7 +214,7 @@ API_FUNC_static_IsArc IsArc_Cpio(const Byte *p, size_t size)
   UInt32 namePos;
   UInt32 nameSize;
   UInt32 mode;
-  // UInt32 rDevMinor;
+  UInt32 rDevMinor;
   UInt32 rDevMajor = 0;
 
   if (p[0] == '0')
@@ -233,7 +231,7 @@ API_FUNC_static_IsArc IsArc_Cpio(const Byte *p, size_t size)
       if (!CheckOctRecord(p))
         return k_IsArc_Res_NO;
       READ_OCT_6 (2 * 6, mode)
-      // READ_OCT_6 (6 * 6, rDevMinor)
+      READ_OCT_6 (6 * 6, rDevMinor)
       READ_OCT_6 (7 * 6 + 11, nameSize)
       namePos = k_OctRecord_Size;
     }
@@ -245,7 +243,7 @@ API_FUNC_static_IsArc IsArc_Cpio(const Byte *p, size_t size)
         return k_IsArc_Res_NO;
       READ_HEX (1, mode)
       READ_HEX (9, rDevMajor)
-      // READ_HEX (10, rDevMinor)
+      READ_HEX (10, rDevMinor)
       READ_HEX (11, nameSize)
       namePos = k_HexRecord_Size;
     }
@@ -257,13 +255,13 @@ API_FUNC_static_IsArc IsArc_Cpio(const Byte *p, size_t size)
     if (p[0] == kMagicBin0 && p[1] == kMagicBin1)
     {
       mode = GetUi16(p + 6);
-      // rDevMinor = GetUi16(p + 14);
+      rDevMinor = GetUi16(p + 14);
       nameSize = GetUi16(p + 20);
     }
     else if (p[0] == kMagicBin1 && p[1] == kMagicBin0)
     {
       mode = GetBe16(p + 6);
-      // rDevMinor = GetBe16(p + 14);
+      rDevMinor = GetBe16(p + 14);
       nameSize = GetBe16(p + 20);
     }
     else
@@ -274,11 +272,8 @@ API_FUNC_static_IsArc IsArc_Cpio(const Byte *p, size_t size)
   if (mode >= (1 << 16))
     return k_IsArc_Res_NO;
 
-  /* v23.02: we have disabled rDevMinor check because real file
-     from Apple contains rDevMinor==255 by some unknown reason */
-  if (rDevMajor != 0
-      // || rDevMinor != 0
-      )
+  if (rDevMajor != 0 ||
+      rDevMinor != 0)
   {
     if (!MY_LIN_S_ISCHR(mode) &&
         !MY_LIN_S_ISBLK(mode))
@@ -436,11 +431,8 @@ HRESULT CInArchive::GetNextItem()
   if (item.Mode >= (1 << 16))
     return S_OK;
 
-  /* v23.02: we have disabled rDevMinor check because real file
-     from Apple contains rDevMinor==255 by some unknown reason */
-  if (item.RDevMajor != 0
-      // || item.RDevMinor != 0
-      )
+  if (item.RDevMinor != 0 ||
+      item.RDevMajor != 0)
   {
     if (!MY_LIN_S_ISCHR(item.Mode) &&
         !MY_LIN_S_ISBLK(item.Mode))
@@ -962,48 +954,38 @@ Z7_CLASS_IMP_NOQIB_1(
   , ISequentialOutStream
 )
   CMyComPtr<ISequentialOutStream> _stream;
-  UInt32 _checksum;
+  UInt64 _size;
+  UInt32 _crc;
   bool _calculate;
 public:
   void SetStream(ISequentialOutStream *stream) { _stream = stream; }
   void ReleaseStream() { _stream.Release(); }
-  void Init(bool calculate)
+  void Init(bool calculate = true)
   {
+    _size = 0;
     _calculate = calculate;
-    _checksum = 0;
+    _crc = 0;
   }
-  UInt32 GetChecksum() const { return _checksum; }
+  void EnableCalc(bool calculate) { _calculate = calculate; }
+  void InitCRC() { _crc = 0; }
+  UInt64 GetSize() const { return _size; }
+  UInt32 GetCRC() const { return _crc; }
 };
-
 
 Z7_COM7F_IMF(COutStreamWithSum::Write(const void *data, UInt32 size, UInt32 *processedSize))
 {
   HRESULT result = S_OK;
   if (_stream)
     result = _stream->Write(data, size, &size);
-  if (processedSize)
-    *processedSize = size;
   if (_calculate)
   {
-    const Byte *p = (const Byte *)data;
-    const Byte *lim = p + size;
-    UInt32 sum = _checksum;
-    if (size >= 4)
-    {
-      lim -= 4 - 1;
-      do
-      {
-        sum += p[0] + p[1] + p[2] + p[3];
-        p += 4;
-      }
-      while (p < lim);
-      lim += 4 - 1;
-    }
-    if (p != lim) { sum += *p++;
-    if (p != lim) { sum += *p++;
-    if (p != lim) { sum += *p++; }}}
-    _checksum = sum;
+    UInt32 crc = 0;
+    for (UInt32 i = 0; i < size; i++)
+      crc += (UInt32)(((const Byte *)data)[i]);
+    _crc += crc;
   }
+  if (processedSize)
+    *processedSize = size;
   return result;
 }
 
@@ -1027,12 +1009,19 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   }
   RINOK(extractCallback->SetTotal(totalSize))
 
-  CMyComPtr2_Create<ICompressCoder, NCompress::CCopyCoder> copyCoder;
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  NCompress::CCopyCoder *copyCoderSpec = new NCompress::CCopyCoder();
+  CMyComPtr<ICompressCoder> copyCoder = copyCoderSpec;
+
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
-  CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> inStream;
-  inStream->SetStream(_stream);
-  CMyComPtr2_Create<ISequentialOutStream, COutStreamWithSum> outStreamSum;
+
+  CLimitedSequentialInStream *streamSpec = new CLimitedSequentialInStream;
+  CMyComPtr<ISequentialInStream> inStream(streamSpec);
+  streamSpec->SetStream(_stream);
+
+  COutStreamWithSum *outStreamSumSpec = new COutStreamWithSum;
+  CMyComPtr<ISequentialOutStream> outStreamSum(outStreamSumSpec);
 
   UInt64 total_PackSize = 0;
   UInt64 total_UnpackSize = 0;
@@ -1044,40 +1033,40 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     RINOK(lps->SetCur())
     if (i >= numItems)
       break;
+    CMyComPtr<ISequentialOutStream> outStream;
     const Int32 askMode = testMode ?
         NExtract::NAskMode::kTest :
         NExtract::NAskMode::kExtract;
     const UInt32 index = allFilesMode ? i : indices[i];
     const CItem &item2 = _items[index];
     const CItem &item = _items[item2.MainIndex_ForInode];
+    RINOK(extractCallback->GetStream(index, &outStream, askMode))
+    
+    total_PackSize += item2.GetPackSize();
+    total_UnpackSize += item.Size;
+
+    if (item2.IsDir())
     {
-      CMyComPtr<ISequentialOutStream> outStream;
-      RINOK(extractCallback->GetStream(index, &outStream, askMode))
-        
-      total_PackSize += item2.GetPackSize();
-      total_UnpackSize += item.Size;
-      
-      if (item2.IsDir())
-      {
-        RINOK(extractCallback->PrepareOperation(askMode))
-        RINOK(extractCallback->SetOperationResult(NExtract::NOperationResult::kOK))
-        continue;
-      }
-      if (!testMode && !outStream)
-        continue;
-      outStreamSum->Init(item.IsCrcFormat());
-      outStreamSum->SetStream(outStream);
       RINOK(extractCallback->PrepareOperation(askMode))
+      RINOK(extractCallback->SetOperationResult(NExtract::NOperationResult::kOK))
+      continue;
     }
+    if (!testMode && !outStream)
+      continue;
+    outStreamSumSpec->Init(item.IsCrcFormat());
+    outStreamSumSpec->SetStream(outStream);
+    outStream.Release();
+
+    RINOK(extractCallback->PrepareOperation(askMode))
     RINOK(InStream_SeekSet(_stream, item.GetDataPosition()))
-    inStream->Init(item.Size);
-    RINOK(copyCoder.Interface()->Code(inStream, outStreamSum, NULL, NULL, lps))
-    outStreamSum->ReleaseStream();
+    streamSpec->Init(item.Size);
+    RINOK(copyCoder->Code(inStream, outStreamSum, NULL, NULL, progress))
+    outStreamSumSpec->ReleaseStream();
     Int32 res = NExtract::NOperationResult::kDataError;
-    if (copyCoder->TotalSize == item.Size)
+    if (copyCoderSpec->TotalSize == item.Size)
     {
       res = NExtract::NOperationResult::kOK;
-      if (item.IsCrcFormat() && item.ChkSum != outStreamSum->GetChecksum())
+      if (item.IsCrcFormat() && item.ChkSum != outStreamSumSpec->GetCRC())
         res = NExtract::NOperationResult::kCRCError;
     }
     RINOK(extractCallback->SetOperationResult(res))

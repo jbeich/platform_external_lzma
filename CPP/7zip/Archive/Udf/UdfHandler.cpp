@@ -332,7 +332,7 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
 
   for (i = 0; i < numItems; i++)
   {
-    const UInt32 index = (allFilesMode ? i : indices[i]);
+    UInt32 index = (allFilesMode ? i : indices[i]);
     const CRef2 &ref2 = _refs2[index];
     const CRef &ref = _archive.LogVols[ref2.Vol].FileSets[ref2.Fs].Refs[ref2.Ref];
     const CFile &file = _archive.Files[ref.FileIndex];
@@ -340,21 +340,24 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     if (!item.IsDir())
       totalSize += item.Size;
   }
-  RINOK(extractCallback->SetTotal(totalSize))
+  extractCallback->SetTotal(totalSize);
 
   UInt64 currentTotalSize = 0;
   
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
-  lps->Init(extractCallback, false);
-  CMyComPtr2_Create<ICompressCoder, NCompress::CCopyCoder> copyCoder;
-  CMyComPtr2_Create<ISequentialOutStream, CLimitedSequentialOutStream> outStream;
+  NCompress::CCopyCoder *copyCoderSpec = new NCompress::CCopyCoder();
+  CMyComPtr<ICompressCoder> copyCoder = copyCoderSpec;
 
-  for (i = 0;; i++)
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
+  lps->Init(extractCallback, false);
+
+  CLimitedSequentialOutStream *outStreamSpec = new CLimitedSequentialOutStream;
+  CMyComPtr<ISequentialOutStream> outStream(outStreamSpec);
+
+  for (i = 0; i < numItems; i++)
   {
     lps->InSize = lps->OutSize = currentTotalSize;
     RINOK(lps->SetCur())
-    if (i >= numItems)
-      break;
     CMyComPtr<ISequentialOutStream> realOutStream;
     const Int32 askMode = testMode ?
         NExtract::NAskMode::kTest :
@@ -380,26 +383,24 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
       continue;
 
     RINOK(extractCallback->PrepareOperation(askMode))
-    outStream->SetStream(realOutStream);
+    outStreamSpec->SetStream(realOutStream);
     realOutStream.Release();
-    outStream->Init(item.Size);
+    outStreamSpec->Init(item.Size);
     Int32 opRes;
+    CMyComPtr<ISequentialInStream> udfInStream;
+    HRESULT res = GetStream(index, &udfInStream);
+    if (res == E_NOTIMPL)
+      opRes = NExtract::NOperationResult::kUnsupportedMethod;
+    else if (res != S_OK)
+      opRes = NExtract::NOperationResult::kDataError;
+    else
     {
-      CMyComPtr<ISequentialInStream> udfInStream;
-      const HRESULT res = GetStream(index, &udfInStream);
-      if (res == E_NOTIMPL)
-        opRes = NExtract::NOperationResult::kUnsupportedMethod;
-      else if (res != S_OK)
-        opRes = NExtract::NOperationResult::kDataError;
-      else
-      {
-        RINOK(copyCoder.Interface()->Code(udfInStream, outStream, NULL, NULL, lps))
-        opRes = outStream->IsFinishedOK() ?
-            NExtract::NOperationResult::kOK:
-            NExtract::NOperationResult::kDataError;
-      }
+      RINOK(copyCoder->Code(udfInStream, outStream, NULL, NULL, progress))
+      opRes = outStreamSpec->IsFinishedOK() ?
+        NExtract::NOperationResult::kOK:
+        NExtract::NOperationResult::kDataError;
     }
-    outStream->ReleaseStream();
+    outStreamSpec->ReleaseStream();
     RINOK(extractCallback->SetOperationResult(opRes))
   }
   return S_OK;

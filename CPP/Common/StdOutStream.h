@@ -14,7 +14,6 @@ class CStdOutStream
   // bool _streamIsOpen;
 public:
   bool IsTerminalMode;
-  CBoolPair ListPathSeparatorSlash;
   int CodePage;
 
   CStdOutStream(FILE *stream = NULL):
@@ -22,14 +21,7 @@ public:
       // _streamIsOpen(false),
       IsTerminalMode(false),
       CodePage(-1)
-  {
-    ListPathSeparatorSlash.Val =
-#ifdef _WIN32
-        false;
-#else
-        true;
-#endif
-  }
+      {}
 
   // ~CStdOutStream() { Close(); }
 
@@ -70,13 +62,12 @@ public:
   void PrintUString(const UString &s, AString &temp);
   void Convert_UString_to_AString(const UString &src, AString &dest);
 
+  void Normalize_UString_LF_Allowed(UString &s);
   void Normalize_UString(UString &s);
-  void Normalize_UString_Path(UString &s);
 
-  void NormalizePrint_UString_Path(const UString &s, UString &tempU, AString &tempA);
-  void NormalizePrint_UString_Path(const UString &s);
+  void NormalizePrint_UString(const UString &s, UString &tempU, AString &tempA);
   void NormalizePrint_UString(const UString &s);
-  void NormalizePrint_wstr_Path(const wchar_t *s);
+  void NormalizePrint_wstr(const wchar_t *s);
 };
 
 CStdOutStream & endl(CStdOutStream & outStream) throw();

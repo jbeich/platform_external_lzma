@@ -5,7 +5,6 @@
 
 #include "../../../../C/Alloc.h"
 
-#include "../../../Common/AutoPtr.h"
 #include "../../../Common/MyBuffer.h"
 #include "../../../Common/MyXml.h"
 
@@ -584,23 +583,27 @@ struct CMidBuf
   {
     if (size > _size)
     {
-      ::z7_AlignedFree(Data);
+      ::MidFree(Data);
       _size = 0;
-      Data = (Byte *)::z7_AlignedAlloc(size);
+      Data = (Byte *)::MidAlloc(size);
       if (Data)
         _size = size;
     }
   }
 
-  ~CMidBuf() { ::z7_AlignedFree(Data); }
+  ~CMidBuf() { ::MidFree(Data); }
 };
 
 
 class CUnpacker
 {
-  CMyComPtr2<ICompressCoder, NCompress::CCopyCoder> copyCoder;
-  CMyUniquePtr<NCompress::NLzx::CDecoder> lzxDecoder;
-  CMyUniquePtr<NCompress::NLzms::CDecoder> lzmsDecoder;
+  NCompress::CCopyCoder *copyCoderSpec;
+  CMyComPtr<ICompressCoder> copyCoder;
+
+  NCompress::NLzx::CDecoder *lzxDecoderSpec;
+  CMyComPtr<IUnknown> lzxDecoder;
+
+  NCompress::NLzms::CDecoder *lzmsDecoder;
 
   CByteBuffer sizesBuf;
 
@@ -634,6 +637,7 @@ public:
       _unpackedChunkIndex(0),
       TotalPacked(0)
       {}
+  ~CUnpacker();
 
   HRESULT Unpack(
       IInStream *inStream,

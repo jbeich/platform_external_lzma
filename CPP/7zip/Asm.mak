@@ -1,11 +1,8 @@
 !IFDEF ASM_OBJS
-!IF "$(PLATFORM)" == "arm64"
-$(ASM_OBJS): ../../../../Asm/arm64/$(*B).S
-	$(COMPL_ASM_CLANG)
-!ELSEIF "$(PLATFORM)" == "arm"
-$(ASM_OBJS): ../../../../Asm/arm/$(*B).asm
+!IF "$(CPU)" == "ARM"
+$(ASM_OBJS): ../../../../Asm/Arm/$(*B).asm
 	$(COMPL_ASM)
-!ELSEIF "$(PLATFORM)" != "ia64" && "$(PLATFORM)" != "mips"
+!ELSEIF "$(CPU)" != "IA64" && "$(CPU)" != "MIPS" && "$(CPU)" != "ARM64"
 $(ASM_OBJS): ../../../../Asm/x86/$(*B).asm
 	$(COMPL_ASM)
 !ENDIF
