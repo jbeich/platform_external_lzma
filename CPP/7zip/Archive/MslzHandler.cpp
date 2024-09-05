@@ -75,7 +75,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       if (_needMoreInput) v |= kpv_ErrorFlags_UnexpectedEnd;
       if (_dataAfterEnd) v |= kpv_ErrorFlags_DataAfterEnd;
       prop = v;
-      break;
     }
   }
   prop.Detach(value);
@@ -153,7 +152,7 @@ void CHandler::ParseName(Byte replaceByte, IArchiveOpenCallback *callback)
   }
   
   if (replaceByte >= 0x20 && replaceByte < 0x80)
-    _name.Add_Char((char)replaceByte);
+    _name += (char)replaceByte;
 }
 
 Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 * /* maxCheckStartPosition */,
@@ -293,9 +292,8 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   if (numItems != (UInt32)(Int32)-1 && (numItems != 1 || indices[0] != 0))
     return E_INVALIDARG;
 
-  // RINOK(extractCallback->SetTotal(_unpackSize))
-  Int32 opRes;
-  {
+  // extractCallback->SetTotal(_unpackSize);
+
   CMyComPtr<ISequentialOutStream> realOutStream;
   const Int32 askMode = testMode ?
       NExtract::NAskMode::kTest :
@@ -304,14 +302,16 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   if (!testMode && !realOutStream)
     return S_OK;
 
-  RINOK(extractCallback->PrepareOperation(askMode))
+  extractCallback->PrepareOperation(askMode);
 
-  CMyComPtr2_Create<ISequentialOutStream, CDummyOutStream> outStream;
-  outStream->SetStream(realOutStream);
-  outStream->Init();
-  // realOutStream.Release();
+  CDummyOutStream *outStreamSpec = new CDummyOutStream;
+  CMyComPtr<ISequentialOutStream> outStream(outStreamSpec);
+  outStreamSpec->SetStream(realOutStream);
+  outStreamSpec->Init();
+  realOutStream.Release();
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
 
   if (_needSeekToStart)
@@ -323,7 +323,7 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   else
     _needSeekToStart = true;
 
-  opRes = NExtract::NOperationResult::kDataError;
+  Int32 opRes = NExtract::NOperationResult::kDataError;
 
   bool isArc = false;
   bool needMoreInput = false;
@@ -344,7 +344,7 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
         unpackSize = GetUi32(buffer + 10);
         if (unpackSize <= kUnpackSizeMax)
         {
-          const HRESULT result = MslzDec(s, outStream, unpackSize, needMoreInput, lps);
+          HRESULT result = MslzDec(s, outStream, unpackSize, needMoreInput, progress);
           if (result == S_OK)
             opRes = NExtract::NOperationResult::kOK;
           else if (result != S_FALSE)
@@ -374,7 +374,8 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     opRes = NExtract::NOperationResult::kUnexpectedEnd;
   else if (_dataAfterEnd)
     opRes = NExtract::NOperationResult::kDataAfterEnd;
-  }
+
+  outStream.Release();
   return extractCallback->SetOperationResult(opRes);
   COM_TRY_END
 }

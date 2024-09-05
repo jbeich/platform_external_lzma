@@ -5,8 +5,7 @@ CFLAGS = $(CFLAGS) \
 LIBS = $(LIBS) ceshell.lib Commctrl.lib
 !ELSE
 LIBS = $(LIBS) comctl32.lib htmlhelp.lib comdlg32.lib Mpr.lib Gdi32.lib
-CFLAGS = $(CFLAGS) -DZ7_DEVICE_FILE
-# -DZ7_LONG_PATH
+CFLAGS = $(CFLAGS) -DZ7_LONG_PATH -DZ7_DEVICE_FILE
 LFLAGS = $(LFLAGS) /DELAYLOAD:mpr.dll
 LIBS = $(LIBS) delayimp.lib
 !ENDIF
@@ -14,7 +13,6 @@ LIBS = $(LIBS) delayimp.lib
 FM_OBJS = \
   $O\App.obj \
   $O\BrowseDialog.obj \
-  $O\BrowseDialog2.obj \
   $O\ClassDefs.obj \
   $O\EnumFormatEtc.obj \
   $O\ExtractCallback.obj \
@@ -27,7 +25,6 @@ FM_OBJS = \
   $O\FSFolderCopy.obj \
   $O\HelpUtils.obj \
   $O\LangUtils.obj \
-  $O\MemDialog.obj \
   $O\MenuPage.obj \
   $O\MyLoadMenu.obj \
   $O\OpenCallback.obj \

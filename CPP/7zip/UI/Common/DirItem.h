@@ -260,8 +260,6 @@ struct CDirItem: public NWindows::NFile::NFind::CFileInfoBase
   int OwnerGroupIndex;
  #endif
 
-  // bool Attrib_IsDefined;
-
   CDirItem():
       PhyParent(-1)
     , LogParent(-1)
@@ -271,7 +269,6 @@ struct CDirItem: public NWindows::NFile::NFind::CFileInfoBase
     , OwnerNameIndex(-1)
     , OwnerGroupIndex(-1)
    #endif
-    // , Attrib_IsDefined(true)
   {
   }
 

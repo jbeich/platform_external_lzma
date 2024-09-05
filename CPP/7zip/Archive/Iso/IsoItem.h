@@ -179,7 +179,7 @@ struct CDirRecord
       
            if (flags & (1 << 1)) link += "./";
       else if (flags & (1 << 2)) link += "../";
-      else if (flags & (1 << 3)) link.Add_Slash();
+      else if (flags & (1 << 3)) link += '/';
       else
         needSlash = true;
 
@@ -201,7 +201,7 @@ struct CDirRecord
         break;
 
       if (needSlash)
-        link.Add_Slash();
+        link += '/';
     }
 
     return true;

@@ -49,7 +49,6 @@ NUserAnswerMode::EEnum ScanUserYesNoAllQuit(CStdOutStream *outStream)
         case kNoAll:  return NUserAnswerMode::kNoAll;
         case kAutoRenameAll: return NUserAnswerMode::kAutoRenameAll;
         case kQuit:   return NUserAnswerMode::kQuit;
-        default: break;
       }
   }
 }

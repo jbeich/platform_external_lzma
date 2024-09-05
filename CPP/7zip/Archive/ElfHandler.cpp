@@ -155,7 +155,6 @@ bool CHeader::Parse(const Byte *p)
 // The program header table itself.
 
 #define PT_PHDR 6
-#define PT_GNU_STACK 0x6474e551
 
 static const CUInt32PCharPair g_SegnmentTypes[] =
 {
@@ -168,7 +167,7 @@ static const CUInt32PCharPair g_SegnmentTypes[] =
   { 6, "Program header table" },
   { 7, "TLS" },
   { 0x6474e550, "GNU_EH_FRAME" },
-  { PT_GNU_STACK, "GNU_STACK" },
+  { 0x6474e551, "GNU_STACK" },
   { 0x6474e552, "GNU_RELRO" }
 };
 
@@ -608,7 +607,6 @@ static const CUInt32PCharPair g_OS[] =
 
 #define k_Machine_MIPS 8
 #define k_Machine_ARM 40
-#define k_Machine_RISCV 243
 
 /*
 #define EF_ARM_ABIMASK        0xFF000000
@@ -642,15 +640,6 @@ static const CUInt32PCharPair g_MIPS_Flags[] =
   { 27, "MDMX" }
 };
 
-static const char * const g_RISCV_Flags[] =
-{
-  "RVC",
-  NULL,
-  NULL,
-  "RVE",
-  "TSO"
-};
-
 
 // #define ET_NONE 0
 #define ET_REL  1
@@ -681,8 +670,6 @@ Z7_CLASS_IMP_CHandler_IInArchive_1(
   CHeader _header;
   bool _headersError;
   bool _allowTail;
-  bool _stackFlags_Defined;
-  UInt32 _stackFlags;
 
   void GetSectionName(UInt32 index, NCOM::CPropVariant &prop, bool showNULL) const;
   HRESULT Open2(IInStream *stream);
@@ -719,7 +706,6 @@ static const Byte kArcProps[] =
   kpidBigEndian,
   kpidHostOS,
   kpidCharacts,
-  kpidComment,
   kpidHeadersSize
 };
 
@@ -796,23 +782,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
           s.Add_Space();
           s += FlagsToString(g_MIPS_Flags, Z7_ARRAY_SIZE(g_MIPS_Flags), flags);
         }
-        else if (_header.Machine == k_Machine_RISCV)
-        {
-          s += "FLOAT_";
-          const UInt32 fl = (flags >> 1) & 3;
-          /*
-          static const char * const g_RISCV_Flags_Float[] =
-            { "SOFT", "SINGLE", "DOUBLE", "QUAD" };
-          s += g_RISCV_Flags_Float[fl];
-          */
-          if (fl)
-            s.Add_UInt32(16u << fl);
-          else
-            s += "SOFT";
-          s.Add_Space();
-          flags &= ~(UInt32)6;
-          s += FlagsToString(g_RISCV_Flags, Z7_ARRAY_SIZE(g_RISCV_Flags), flags);
-        }
         else
         {
           char sz[16];
@@ -826,14 +795,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
 
     case kpidHostOS: PAIR_TO_PROP(g_OS, _header.Os, prop); break;
     case kpidCharacts: TYPE_TO_PROP(g_Types, _header.Type, prop); break;
-    case kpidComment:
-      if (_stackFlags_Defined)
-      {
-        AString s ("STACK: ");
-        s += FlagsToString(g_SegmentFlags, Z7_ARRAY_SIZE(g_SegmentFlags), _stackFlags);
-        prop = s;
-      }
-      break;
     case kpidExtension:
     {
       const char *s = NULL;
@@ -952,13 +913,9 @@ HRESULT CHandler::Open2(IInStream *stream)
       CSegment seg;
       seg.Parse(p, _header.Mode64, _header.Be);
       seg.UpdateTotalSize(_totalSize);
-      if (seg.Type == PT_GNU_STACK && !_stackFlags_Defined)
-      {
-        _stackFlags = seg.Flags;
-        _stackFlags_Defined = true;
-      }
-      if (addSegments && seg.Type != PT_PHDR)
-        _segments.AddInReserved(seg);
+      if (addSegments)
+        if (seg.Type != PT_PHDR)
+          _segments.AddInReserved(seg);
     }
   }
 
@@ -1045,7 +1002,6 @@ Z7_COM7F_IMF(CHandler::Close())
 {
   _totalSize = 0;
   _headersError = false;
-  _stackFlags_Defined = false;
 
   _inStream.Release();
   _segments.Clear();
@@ -1078,23 +1034,26 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
         _segments[index].Size :
         _sections[index - _segments.Size()].GetSize();
   }
-  RINOK(extractCallback->SetTotal(totalSize))
+  extractCallback->SetTotal(totalSize);
 
   UInt64 currentTotalSize = 0;
   UInt64 currentItemSize;
   
-  CMyComPtr2_Create<ICompressCoder, NCompress::CCopyCoder> copyCoder;
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
-  lps->Init(extractCallback, false);
-  CMyComPtr2_Create<ISequentialInStream, CLimitedSequentialInStream> inStream;
-  inStream->SetStream(_inStream);
+  NCompress::CCopyCoder *copyCoderSpec = new NCompress::CCopyCoder();
+  CMyComPtr<ICompressCoder> copyCoder = copyCoderSpec;
 
-  for (i = 0;; i++, currentTotalSize += currentItemSize)
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
+  lps->Init(extractCallback, false);
+
+  CLimitedSequentialInStream *streamSpec = new CLimitedSequentialInStream;
+  CMyComPtr<ISequentialInStream> inStream(streamSpec);
+  streamSpec->SetStream(_inStream);
+
+  for (i = 0; i < numItems; i++, currentTotalSize += currentItemSize)
   {
     lps->InSize = lps->OutSize = currentTotalSize;
     RINOK(lps->SetCur())
-    if (i >= numItems)
-      break;
     const Int32 askMode = testMode ?
         NExtract::NAskMode::kTest :
         NExtract::NAskMode::kExtract;
@@ -1112,17 +1071,18 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
       currentItemSize = item.GetSize();
       offset = item.Offset;
     }
-    {
-      CMyComPtr<ISequentialOutStream> outStream;
-      RINOK(extractCallback->GetStream(index, &outStream, askMode))
-      if (!testMode && !outStream)
-        continue;
-      RINOK(extractCallback->PrepareOperation(askMode))
-      RINOK(InStream_SeekSet(_inStream, offset))
-      inStream->Init(currentItemSize);
-      RINOK(copyCoder.Interface()->Code(inStream, outStream, NULL, NULL, lps))
-    }
-    RINOK(extractCallback->SetOperationResult(copyCoder->TotalSize == currentItemSize ?
+    
+    CMyComPtr<ISequentialOutStream> outStream;
+    RINOK(extractCallback->GetStream(index, &outStream, askMode))
+    if (!testMode && !outStream)
+      continue;
+      
+    RINOK(extractCallback->PrepareOperation(askMode))
+    RINOK(InStream_SeekSet(_inStream, offset))
+    streamSpec->Init(currentItemSize);
+    RINOK(copyCoder->Code(inStream, outStream, NULL, NULL, progress))
+    outStream.Release();
+    RINOK(extractCallback->SetOperationResult(copyCoderSpec->TotalSize == currentItemSize ?
         NExtract::NOperationResult::kOK:
         NExtract::NOperationResult::kDataError))
   }

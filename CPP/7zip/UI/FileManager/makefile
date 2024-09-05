@@ -2,8 +2,6 @@ PROG = 7zFM.exe
 CFLAGS = $(CFLAGS) \
   -DZ7_EXTERNAL_CODECS \
 
-# -DZ7_NO_LARGE_PAGES
-
 !include "FM.mak"
 
 COMMON_OBJS = \

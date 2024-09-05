@@ -19,25 +19,25 @@ namespace NDecoder {
 
 const unsigned kMatchMinLen = 3;
 const unsigned kMatchMaxLen = 256;
-const unsigned NC = 256 + kMatchMaxLen - kMatchMinLen + 1;
+const unsigned NC = (256 + kMatchMaxLen - kMatchMinLen + 1);
 const unsigned NUM_CODE_BITS = 16;
 const unsigned NUM_DIC_BITS_MAX = 25;
-const unsigned NT = NUM_CODE_BITS + 3;
-const unsigned NP = NUM_DIC_BITS_MAX + 1;
+const unsigned NT = (NUM_CODE_BITS + 3);
+const unsigned NP = (NUM_DIC_BITS_MAX + 1);
 const unsigned NPT = NP; // Max(NT, NP)
 
-class CCoder
-{
+Z7_CLASS_IMP_NOQIB_1(
+  CCoder
+  , ICompressCoder
+)
   CLzOutWindow _outWindow;
   NBitm::CDecoder<CInBuffer> _inBitStream;
 
   int _symbolT;
   int _symbolC;
-  UInt32 DictSize;
-  // bool FinishMode;
 
-  NHuffman::CDecoder256<NUM_CODE_BITS, NPT, 7> _decoderT;
-  NHuffman::CDecoder<NUM_CODE_BITS, NC, 10> _decoderC;
+  NHuffman::CDecoder<NUM_CODE_BITS, NPT> _decoderT;
+  NHuffman::CDecoder<NUM_CODE_BITS, NC> _decoderC;
 
   class CCoderReleaser
   {
@@ -52,15 +52,16 @@ class CCoder
   bool ReadTP(unsigned num, unsigned numBits, int spec);
   bool ReadC();
 
-  HRESULT CodeReal(UInt32 outSize, ICompressProgressInfo *progress);
+  HRESULT CodeReal(UInt64 outSize, ICompressProgressInfo *progress);
 public:
-  CCoder(): DictSize(1 << 16)
-      // , FinishMode(true)
-      {}
-  void SetDictSize(UInt32 dictSize) { DictSize = dictSize; }
+  UInt32 DictSize;
+  bool FinishMode;
+
+  void SetDictSize(unsigned dictSize) { DictSize = dictSize; }
+  
+  CCoder(): DictSize(1 << 16), FinishMode(false) {}
+
   UInt64 GetInputProcessedSize() const { return _inBitStream.GetProcessedSize(); }
-  HRESULT Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-      UInt32 outSize, ICompressProgressInfo *progress);
 };
 
 }}}

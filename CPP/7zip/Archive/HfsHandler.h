@@ -23,7 +23,7 @@ struct CCompressHeader
   bool IsResource;
 
   bool IsMethod_Compressed_Inline() const { return DataPos == k_decmpfs_HeaderSize; }
-  bool IsMethod_Uncompressed_Inline() const { return DataPos == k_decmpfs_HeaderSize + 1; }
+  bool IsMethod_Uncompressed_Inline()       const { return DataPos == k_decmpfs_HeaderSize + 1; }
   bool IsMethod_Resource() const { return IsResource; }
 
   void Parse(const Byte *p, size_t size);
@@ -48,8 +48,11 @@ void MethodsMaskToProp(UInt32 methodsMask, NWindows::NCOM::CPropVariant &prop);
 
 class CDecoder
 {
-  CMyComPtr2_Create<ICompressCoder, NCompress::NZlib::CDecoder> _zlibDecoder;
-  CMyComPtr2_Create<ICompressCoder, NCompress::NLzfse::CDecoder> _lzfseDecoder;
+  NCompress::NZlib::CDecoder *_zlibDecoderSpec;
+  CMyComPtr<ICompressCoder> _zlibDecoder;
+
+  NCompress::NLzfse::CDecoder *_lzfseDecoderSpec;
+  CMyComPtr<ICompressCoder> _lzfseDecoder;
 
   CByteBuffer _tableBuf;
   CByteBuffer _buf;
@@ -79,7 +82,7 @@ public:
       UInt64 progressStart, IArchiveExtractCallback *extractCallback,
       int &opRes);
 
-  CDecoder(bool IsAdlerOptional);
+  CDecoder();
 };
 
 }}

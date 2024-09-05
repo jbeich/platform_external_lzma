@@ -7,14 +7,14 @@
 #include "../../Common/ComTry.h"
 #include "../../Common/DynamicBuffer.h"
 #include "../../Common/IntToString.h"
-#include "../../Common/StringToInt.h"
+#include "../../Common/MyVector.h"
 
 #include "../../Windows/PropVariant.h"
 
-#include "../Common/InBuffer.h"
 #include "../Common/ProgressUtils.h"
 #include "../Common/RegisterArc.h"
 #include "../Common/StreamUtils.h"
+#include "../Common/InBuffer.h"
 
 namespace NArchive {
 namespace NIhex {
@@ -68,7 +68,6 @@ Z7_COM7F_IMF(CHandler::GetArchiveProperty(PROPID propID, PROPVARIANT *value))
       if (_needMoreInput) v |= kpv_ErrorFlags_UnexpectedEnd;
       if (_dataError) v |= kpv_ErrorFlags_DataError;
       prop = v;
-      break;
     }
   }
   prop.Detach(value);
@@ -100,12 +99,19 @@ Z7_COM7F_IMF(CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *val
   COM_TRY_END
 }
 
+static inline int HexToByte(unsigned c)
+{
+  if (c >= '0' && c <= '9') return (int)(c - '0');
+  if (c >= 'A' && c <= 'F') return (int)(c - 'A' + 10);
+  if (c >= 'a' && c <= 'f') return (int)(c - 'a' + 10);
+  return -1;
+}
 
 static int Parse(const Byte *p)
 {
-  unsigned v0 = p[0];  Z7_PARSE_HEX_DIGIT(v0, return -1;)
-  unsigned v1 = p[1];  Z7_PARSE_HEX_DIGIT(v1, return -1;)
-  return (int)((v0 << 4) | v1);
+  const int c1 = HexToByte(p[0]); if (c1 < 0) return -1;
+  const int c2 = HexToByte(p[1]); if (c2 < 0) return -1;
+  return (c1 << 4) | c2;
 }
   
 #define kType_Data 0
@@ -117,11 +123,7 @@ static int Parse(const Byte *p)
 
 #define kType_MAX  5
 
-// we don't want to read files with big number of spaces between records
-// it's our limitation (out of specification):
-static const unsigned k_NumSpaces_LIMIT = 16 + 1;
-
-#define IS_LINE_DELIMITER(c) (/* (c) == 0 || */ (c) == 10 || (c) == 13)
+#define IS_LINE_DELIMITER(c) ((c) == 0 || (c) == 10 || (c) == 13)
 
 API_FUNC_static_IsArc IsArc_Ihex(const Byte *p, size_t size)
 {
@@ -139,11 +141,11 @@ API_FUNC_static_IsArc IsArc_Ihex(const Byte *p, size_t size)
     if (size < 4 * 2)
       return k_IsArc_Res_NEED_MORE;
     
-    const int num = Parse(p);
+    int num = Parse(p);
     if (num < 0)
       return k_IsArc_Res_NO;
     
-    const int type = Parse(p + 6);
+    int type = Parse(p + 6);
     if (type < 0 || type > kType_MAX)
       return k_IsArc_Res_NO;
     
@@ -160,7 +162,7 @@ API_FUNC_static_IsArc IsArc_Ihex(const Byte *p, size_t size)
       sum += (unsigned)v;
     }
     
-    if (sum & 0xFF)
+    if ((sum & 0xFF) != 0)
       return k_IsArc_Res_NO;
 
     if (type == kType_Data)
@@ -197,17 +199,17 @@ API_FUNC_static_IsArc IsArc_Ihex(const Byte *p, size_t size)
     p += numChars;
     size -= numChars;
     
-    unsigned numSpaces = k_NumSpaces_LIMIT;
     for (;;)
     {
       if (size == 0)
         return k_IsArc_Res_NEED_MORE;
       const Byte b = *p++;
       size--;
+      if (IS_LINE_DELIMITER(b))
+        continue;
       if (b == ':')
         break;
-      if (--numSpaces == 0 || !IS_LINE_DELIMITER(b))
-        return k_IsArc_Res_NO;
+      return k_IsArc_Res_NO;
     }
   }
   
@@ -215,7 +217,7 @@ API_FUNC_static_IsArc IsArc_Ihex(const Byte *p, size_t size)
 }
 }
 
-Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallback *openCallback))
+Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallback *))
 {
   COM_TRY_BEGIN
   {
@@ -227,7 +229,7 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
     {
       size_t size = kStartSize;
       RINOK(ReadStream(stream, temp, &size))
-      const UInt32 isArcRes = IsArc_Ihex(temp, size);
+      UInt32 isArcRes = IsArc_Ihex(temp, size);
       if (isArcRes == k_IsArc_Res_NO)
         return S_FALSE;
       if (isArcRes == k_IsArc_Res_NEED_MORE && size != kStartSize)
@@ -241,6 +243,7 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
       return E_OUTOFMEMORY;
     s.SetStream(stream);
     s.Init();
+
     {
       Byte b;
       if (!s.ReadByte(b))
@@ -256,8 +259,6 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
     }
 
     UInt32 globalOffset = 0;
-    const UInt32 k_progressStep = 1 << 24;
-    UInt64 progressNext = k_progressStep;
 
     for (;;)
     {
@@ -272,14 +273,16 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
         _dataError = true;
         return S_FALSE;
       }
+      
       {
-        const size_t numPairs = (unsigned)num + 4;
-        const size_t numBytes = numPairs * 2;
+        size_t numPairs = ((unsigned)num + 4);
+        size_t numBytes = numPairs * 2;
         if (s.ReadBytes(temp, numBytes) != numBytes)
         {
           _needMoreInput = true;
           return S_FALSE;
         }
+        
         unsigned sum = (unsigned)num;
         for (size_t i = 0; i < numPairs; i++)
         {
@@ -292,21 +295,21 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
           temp[i] = (Byte)a;
           sum += (unsigned)a;
         }
-        if (sum & 0xFF)
+        if ((sum & 0xFF) != 0)
         {
           _dataError = true;
           return S_FALSE;
         }
       }
 
-      const unsigned type = temp[2];
+      unsigned type = temp[2];
       if (type > kType_MAX)
       {
         _dataError = true;
         return S_FALSE;
       }
 
-      const UInt32 a = GetBe16(temp);
+      UInt32 a = GetBe16(temp);
 
       if (type == kType_Data)
       {
@@ -319,7 +322,7 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
         }
         // if (num != 0)
         {
-          const UInt32 offs = globalOffset + a;
+          UInt32 offs = globalOffset + a;
           CBlock *block = NULL;
           if (!_blocks.IsEmpty())
           {
@@ -335,21 +338,10 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
           block->Data.AddData(temp + 3, (unsigned)num);
         }
       }
-      else
+      else if (type == kType_Eof)
       {
-        if (a != 0) // from description: the address field is typically 0.
+        _phySize = s.GetProcessedSize();
         {
-          _dataError = true;
-          return S_FALSE;
-        }
-        if (type == kType_Eof)
-        {
-          if (num != 0)
-          {
-            _dataError = true;
-            return S_FALSE;
-          }
-          _phySize = s.GetProcessedSize();
           Byte b;
           if (s.ReadByte(b))
           {
@@ -365,9 +357,16 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
               }
             }
           }
-          return S_OK;
         }
-  
+        return S_OK;
+      }
+      else
+      {
+        if (a != 0)
+        {
+          _dataError = true;
+          return S_FALSE;
+        }
         if (type == kType_Seg || type == kType_High)
         {
           if (num != 2)
@@ -375,8 +374,8 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
             _dataError = true;
             return S_FALSE;
           }
-          // here we use optimization trick for num shift calculation: (type == kType_Seg ? 4 : 16)
-          globalOffset = (UInt32)GetBe16(temp + 3) << (1u << type);
+          UInt32 d = GetBe16(temp + 3);
+          globalOffset = d << (type == kType_Seg ? 4 : 16);
         }
         else
         {
@@ -388,18 +387,6 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
         }
       }
 
-      if (openCallback)
-      {
-        const UInt64 processed = s.GetProcessedSize();
-        if (processed >= progressNext)
-        {
-          progressNext = processed + k_progressStep;
-          const UInt64 numFiles = _blocks.Size();
-          RINOK(openCallback->SetCompleted(&numFiles, &processed))
-        }
-      }
-
-      unsigned numSpaces = k_NumSpaces_LIMIT;
       for (;;)
       {
         Byte b;
@@ -408,13 +395,12 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
           _needMoreInput = true;
           return S_FALSE;
         }
+        if (IS_LINE_DELIMITER(b))
+          continue;
         if (b == ':')
           break;
-        if (--numSpaces == 0 || !IS_LINE_DELIMITER(b))
-        {
-          _dataError = true;
-          return S_FALSE;
-        }
+        _dataError = true;
+        return S_FALSE;
       }
     }
   }
@@ -423,13 +409,14 @@ Z7_COM7F_IMF(CHandler::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallb
   COM_TRY_END
 }
 
-
 Z7_COM7F_IMF(CHandler::Close())
 {
   _phySize = 0;
+  
   _isArc = false;
   _needMoreInput = false;
   _dataError = false;
+
   _blocks.Clear();
   return S_OK;
 }
@@ -449,40 +436,53 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
   UInt32 i;
   for (i = 0; i < numItems; i++)
     totalSize += _blocks[allFilesMode ? i : indices[i]].Data.GetPos();
-  RINOK(extractCallback->SetTotal(totalSize))
+  extractCallback->SetTotal(totalSize);
 
-  CMyComPtr2_Create<ICompressProgressInfo, CLocalProgress> lps;
+  UInt64 currentTotalSize = 0;
+  UInt64 currentItemSize;
+
+  CLocalProgress *lps = new CLocalProgress;
+  CMyComPtr<ICompressProgressInfo> progress = lps;
   lps->Init(extractCallback, false);
 
-  for (i = 0;; i++)
+  for (i = 0; i < numItems; i++, currentTotalSize += currentItemSize)
   {
-    lps->InSize = lps->OutSize;
+    currentItemSize = 0;
+    lps->InSize = lps->OutSize = currentTotalSize;
     RINOK(lps->SetCur())
-    if (i >= numItems)
-      break;
+
     const UInt32 index = allFilesMode ? i : indices[i];
     const CByteDynamicBuffer &data = _blocks[index].Data;
-    lps->OutSize += data.GetPos();
+    currentItemSize = data.GetPos();
+    
+    CMyComPtr<ISequentialOutStream> realOutStream;
+    const Int32 askMode = testMode ?
+        NExtract::NAskMode::kTest :
+        NExtract::NAskMode::kExtract;
+    
+    RINOK(extractCallback->GetStream(index, &realOutStream, askMode))
+    
+    if (!testMode && !realOutStream)
+      continue;
+    
+    extractCallback->PrepareOperation(askMode);
+    
+    if (realOutStream)
     {
-      CMyComPtr<ISequentialOutStream> realOutStream;
-      const Int32 askMode = testMode ?
-          NExtract::NAskMode::kTest :
-          NExtract::NAskMode::kExtract;
-      RINOK(extractCallback->GetStream(index, &realOutStream, askMode))
-      if (!testMode && !realOutStream)
-        continue;
-      RINOK(extractCallback->PrepareOperation(askMode))
-      if (realOutStream)
-        RINOK(WriteStream(realOutStream, (const Byte *)data, data.GetPos()))
+      RINOK(WriteStream(realOutStream, (const Byte *)data, data.GetPos()))
     }
+  
+    realOutStream.Release();
     RINOK(extractCallback->SetOperationResult(NExtract::NOperationResult::kOK))
   }
   
-  return S_OK;
+  lps->InSize = lps->OutSize = currentTotalSize;
+  return lps->SetCur();
+
   COM_TRY_END
 }
 
-// k_Signature: { ':' }
+// k_Signature: { ':', '1' }
 
 REGISTER_ARC_I_NO_SIG(
   "IHex", "ihex", NULL, 0xCD,

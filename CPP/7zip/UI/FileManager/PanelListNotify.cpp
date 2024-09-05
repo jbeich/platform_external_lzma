@@ -32,12 +32,12 @@ using namespace NWindows;
 #define SPACE_TERMINATOR_CHAR (wchar_t)(0x9C)
 
 #define INT_TO_STR_SPEC(v) \
-  while (v >= 10) { temp[i++] = (Byte)('0' + (unsigned)(v % 10)); v /= 10; } \
-  *s++ = (Byte)('0' + (unsigned)v);
+  while (v >= 10) { temp[i++] = (unsigned char)('0' + (unsigned)(v % 10)); v /= 10; } \
+  *s++ = (unsigned char)('0' + (unsigned)v);
 
 static void ConvertSizeToString(UInt64 val, wchar_t *s) throw()
 {
-  Byte temp[32];
+  unsigned char temp[32];
   unsigned i = 0;
   
   if (val <= (UInt32)0xFFFFFFFF)
@@ -91,6 +91,30 @@ UString ConvertSizeToString(UInt64 value)
   ConvertSizeToString(value, s);
   return s;
 }
+
+static inline unsigned GetHex_Upper(unsigned v)
+{
+  return (v < 10) ? ('0' + v) : ('A' + (v - 10));
+}
+
+static inline unsigned GetHex_Lower(unsigned v)
+{
+  return (v < 10) ? ('0' + v) : ('a' + (v - 10));
+}
+
+/*
+static void HexToString(char *dest, const Byte *data, UInt32 size)
+{
+  for (UInt32 i = 0; i < size; i++)
+  {
+    unsigned b = data[i];
+    dest[0] = GetHex((b >> 4) & 0xF);
+    dest[1] = GetHex(b & 0xF);
+    dest += 2;
+  }
+  *dest = 0;
+}
+*/
 
 bool IsSizeProp(UINT propID) throw();
 bool IsSizeProp(UINT propID) throw()
@@ -196,8 +220,6 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
 
   if (item.cchTextMax <= 1)
     return 0;
-
-  // item.cchTextMax > 1
   
   const CPropColumn &property = _visibleColumns[item.iSubItem];
   PROPID propID = property.ID;
@@ -268,10 +290,12 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
     UInt32 dataSize;
     UInt32 propType;
     RINOK(_folderRawProps->GetRawProp(realIndex, propID, &data, &dataSize, &propType))
-    unsigned limit = (unsigned)item.cchTextMax - 1;
-    // limit != 0
+    const unsigned limit = (unsigned)item.cchTextMax - 1;
     if (dataSize == 0)
+    {
+      text[0] = 0;
       return 0;
+    }
     
     if (propID == kpidNtReparse)
     {
@@ -282,7 +306,7 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
         unsigned i;
         for (i = 0; i < limit; i++)
         {
-          const wchar_t c = s[i];
+          wchar_t c = s[i];
           if (c == 0)
             break;
           text[i] = c;
@@ -300,7 +324,7 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
         unsigned i;
         for (i = 0; i < limit; i++)
         {
-          const wchar_t c = (Byte)s[i];
+          wchar_t c = (Byte)s[i];
           if (c == 0)
             break;
           text[i] = c;
@@ -322,29 +346,33 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
           wchar_t c = (Byte)temp[i];
           if (c == 0)
             break;
-          *text++ = c;
+          text[i] = c;
         }
-        *text = 0;
+        text[i] = 0;
       }
       else
       {
-        const char * const k_Hex =
-          (dataSize <= 8
-            && (propID == kpidCRC || propID == kpidChecksum))
-            ? k_Hex_Upper : k_Hex_Lower;
-        limit /= 2;
-        if (limit > dataSize)
-            limit = dataSize;
-        const Byte *data2 = (const Byte *)data;
-        do
+        if (dataSize > limit)
+          dataSize = limit;
+        WCHAR *dest = text;
+        const bool needUpper = (dataSize <= 8)
+            && (propID == kpidCRC || propID == kpidChecksum);
+        for (UInt32 i = 0; i < dataSize; i++)
         {
-          const size_t b = *data2++;
-          text[0] = (Byte)k_Hex[b >> 4];
-          text[1] = (Byte)k_Hex[b & 15];
-          text += 2;
+          unsigned b = ((const Byte *)data)[i];
+          if (needUpper)
+          {
+            dest[0] = (WCHAR)GetHex_Upper((b >> 4) & 0xF);
+            dest[1] = (WCHAR)GetHex_Upper(b & 0xF);
+          }
+          else
+          {
+            dest[0] = (WCHAR)GetHex_Lower((b >> 4) & 0xF);
+            dest[1] = (WCHAR)GetHex_Lower(b & 0xF);
+          }
+          dest += 2;
         }
-        while (--limit);
-        *text = 0;
+        *dest = 0;
       }
     }
     return 0;
@@ -521,6 +549,10 @@ LRESULT CPanel::SetItemText(LVITEMW &item)
   return 0;
 }
 
+#ifndef UNDER_CE
+extern DWORD g_ComCtl32Version;
+#endif
+
 void CPanel::OnItemChanged(NMLISTVIEW *item)
 {
   const unsigned index = (unsigned)item->lParam;
@@ -659,9 +691,9 @@ bool CPanel::OnNotifyList(LPNMHDR header, LRESULT &result)
       SetFocusToList();
       Post_Refresh_StatusBar();
       if (_mySelectMode)
-#ifdef Z7_USE_DYN_ComCtl32Version
+        #ifndef UNDER_CE
         if (g_ComCtl32Version >= MAKELONG(71, 4))
-#endif
+        #endif
           OnLeftClick((MY_NMLISTVIEW_NMITEMACTIVATE *)header);
       return false;
     }
@@ -811,7 +843,7 @@ void CPanel::Refresh_StatusBar()
       NCOM::CPropVariant prop;
       if (_folder->GetProperty(realIndex, kpidMTime, &prop) == S_OK)
       {
-        char dateString2[64];
+        char dateString2[32];
         dateString2[0] = 0;
         ConvertPropertyToShortString2(dateString2, prop, kpidMTime);
         for (unsigned i = 0;; i++)

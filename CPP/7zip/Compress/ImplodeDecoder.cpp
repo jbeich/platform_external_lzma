@@ -13,21 +13,26 @@ namespace NDecoder {
 bool CHuffmanDecoder::Build(const Byte *lens, unsigned numSymbols) throw()
 {
   unsigned counts[kNumHuffmanBits + 1];
+  
   unsigned i;
   for (i = 0; i <= kNumHuffmanBits; i++)
     counts[i] = 0;
-  for (i = 0; i < numSymbols; i++)
-    counts[lens[i]]++;
+  
+  unsigned sym;
+  for (sym = 0; sym < numSymbols; sym++)
+    counts[lens[sym]]++;
 
   const UInt32 kMaxValue = (UInt32)1 << kNumHuffmanBits;
+  
   // _limits[0] = kMaxValue;
+
   UInt32 startPos = kMaxValue;
-  unsigned sum = 0;
+  UInt32 sum = 0;
 
   for (i = 1; i <= kNumHuffmanBits; i++)
   {
-    const unsigned cnt = counts[i];
-    const UInt32 range = (UInt32)cnt << (kNumHuffmanBits - i);
+    const UInt32 cnt = counts[i];
+    const UInt32 range = cnt << (kNumHuffmanBits - i);
     if (startPos < range)
       return false;
     startPos -= range;
@@ -36,26 +41,29 @@ bool CHuffmanDecoder::Build(const Byte *lens, unsigned numSymbols) throw()
     sum += cnt;
     counts[i] = sum;
   }
+
   // counts[0] += sum;
+
   if (startPos != 0)
     return false;
-  for (i = 0; i < numSymbols; i++)
+
+  for (sym = 0; sym < numSymbols; sym++)
   {
-    const unsigned len = lens[i];
+    const unsigned len = lens[sym];
     if (len != 0)
-      _symbols[--counts[len]] = (Byte)i;
+      _symbols[--counts[len]] = (Byte)sym;
   }
+
   return true;
 }
 
 
-unsigned CHuffmanDecoder::Decode(CInBit *inStream) const throw()
+UInt32 CHuffmanDecoder::Decode(CInBit *inStream) const throw()
 {
   const UInt32 val = inStream->GetValue(kNumHuffmanBits);
-  size_t numBits;
+  unsigned numBits;
   for (numBits = 1; val < _limits[numBits]; numBits++);
-  const unsigned sym = _symbols[_poses[numBits]
-      + (unsigned)((val - _limits[numBits]) >> (kNumHuffmanBits - numBits))];
+  const UInt32 sym = _symbols[_poses[numBits] + ((val - _limits[numBits]) >> (kNumHuffmanBits - numBits))];
   inStream->MovePos(numBits);
   return sym;
 }
@@ -88,12 +96,12 @@ bool CCoder::BuildHuff(CHuffmanDecoder &decoder, unsigned numSymbols)
   do
   {
     const unsigned b = (unsigned)_inBitStream.ReadAlignedByte();
-    const unsigned level = (b & 0xF) + 1;
+    const Byte level = (Byte)((b & 0xF) + 1);
     const unsigned rep = ((unsigned)b >> 4) + 1;
     if (index + rep > numSymbols)
       return false;
     for (unsigned j = 0; j < rep; j++)
-      levels[index++] = (Byte)level;
+      levels[index++] = level;
   }
   while (--numRecords);
 
@@ -138,11 +146,11 @@ HRESULT CCoder::CodeReal(ISequentialInStream *inStream, ISequentialOutStream *ou
 
   while (pos < unPackSize)
   {
-    if (pos - prevProgress >= (1u << 18) && progress)
+    if (progress && (pos - prevProgress) >= (1 << 18))
     {
-      prevProgress = pos;
       const UInt64 packSize = _inBitStream.GetProcessedSize();
       RINOK(progress->SetRatioInfo(&packSize, &pos))
+      prevProgress = pos;
     }
 
     if (_inBitStream.ReadBits(1) != 0)
@@ -150,7 +158,7 @@ HRESULT CCoder::CodeReal(ISequentialInStream *inStream, ISequentialOutStream *ou
       Byte b;
       if (literalsOn)
       {
-        const unsigned sym = _litDecoder.Decode(&_inBitStream);
+        const UInt32 sym = _litDecoder.Decode(&_inBitStream);
         // if (sym >= kLitTableSize) break;
         b = (Byte)sym;
       }
@@ -162,36 +170,36 @@ HRESULT CCoder::CodeReal(ISequentialInStream *inStream, ISequentialOutStream *ou
     else
     {
       const UInt32 lowDistBits = _inBitStream.ReadBits(numDistDirectBits);
-      UInt32 dist = (UInt32)_distDecoder.Decode(&_inBitStream);
+      UInt32 dist = _distDecoder.Decode(&_inBitStream);
       // if (dist >= kDistTableSize) break;
       dist = (dist << numDistDirectBits) + lowDistBits;
-      unsigned len = _lenDecoder.Decode(&_inBitStream);
+      UInt32 len = _lenDecoder.Decode(&_inBitStream);
       // if (len >= kLenTableSize) break;
       if (len == kLenTableSize - 1)
         len += _inBitStream.ReadBits(kNumLenDirectBits);
       len += minMatchLen;
+
       {
         const UInt64 limit = unPackSize - pos;
-        // limit != 0
         if (len > limit)
         {
           moreOut = true;
           len = (UInt32)limit;
         }
       }
-      do
+
+      while (dist >= pos && len != 0)
       {
-        // len != 0
-        if (dist < pos)
-        {
-          _outWindowStream.CopyBlock(dist, len);
-          pos += len;
-          break;
-        }
         _outWindowStream.PutByte(0);
         pos++;
+        len--;
       }
-      while (--len);
+      
+      if (len != 0)
+      {
+        _outWindowStream.CopyBlock(dist, len);
+        pos += len;
+      }
     }
   }
 

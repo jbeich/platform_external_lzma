@@ -282,7 +282,7 @@ HRESULT CArchive::GetNextItemReal(CItemEx &item)
   {
     item.Prefix_WasUsed = true;
     ReadString(p, NFileHeader::kPrefixSize, item.Name);
-    item.Name.Add_Slash();
+    item.Name += '/';
     unsigned i;
     for (i = 0; i < NFileHeader::kNameSize; i++)
       if (buf[i] == 0)
@@ -541,7 +541,6 @@ struct CPaxInfo: public CPaxTimes
   bool Link_Defined;
   bool User_Defined;
   bool Group_Defined;
-  bool SCHILY_fflags_Defined;
   
   UInt64 Size;
   UInt32 UID;
@@ -552,7 +551,6 @@ struct CPaxInfo: public CPaxTimes
   AString User;
   AString Group;
   AString UnknownLines;
-  AString SCHILY_fflags;
   
   bool ParseID(const AString &val, bool &defined, UInt32 &res)
   {
@@ -650,7 +648,6 @@ bool CPaxInfo::ParsePax(const CTempBuffer &tb, bool isFile)
   Link_Defined = false;
   User_Defined = false;
   Group_Defined = false;
-  SCHILY_fflags_Defined = false;
   
   // CPaxTimes::Clear();
 
@@ -762,14 +759,6 @@ bool CPaxInfo::ParsePax(const CTempBuffer &tb, bool isFile)
         { parsed = ParsePaxTime(val, ATime, DoubleTagError); }
       else if (name.IsEqualTo("ctime"))
         { parsed = ParsePaxTime(val, CTime, DoubleTagError); }
-      else if (name.IsEqualTo("SCHILY.fflags"))
-      {
-        if (SCHILY_fflags_Defined)
-          DoubleTagError = true;
-        SCHILY_fflags = val;
-        SCHILY_fflags_Defined = true;
-        parsed = true;
-      }
       else
         isDetectedName = false;
       if (isDetectedName && !parsed)
@@ -823,7 +812,6 @@ HRESULT CArchive::ReadItem2(CItemEx &item)
   item.pax_size_WasUsed = false;
   
   item.PaxExtra.Clear();
-  item.SCHILY_fflags.Empty();
 
   item.EncodingCharacts.Clear();
   
@@ -1044,11 +1032,6 @@ HRESULT CArchive::ReadItem2(CItemEx &item)
         item.Group = paxInfo.Group;
         // item.pax_gname_WasUsed = true;
       }
-      if (paxInfo.SCHILY_fflags_Defined)
-      {
-        item.SCHILY_fflags = paxInfo.SCHILY_fflags;
-        // item.SCHILY_fflags_WasUsed = true;
-      }
       if (paxInfo.UID_Defined)
       {
         item.UID = (UInt32)paxInfo.UID;
@@ -1115,7 +1098,6 @@ HRESULT CArchive::ReadItem(CItemEx &item)
     if (item.PaxTimes.MTime.IsDefined())  _are_mtime = true;
     if (item.PaxTimes.ATime.IsDefined())  _are_atime = true;
     if (item.PaxTimes.CTime.IsDefined())  _are_ctime = true;
-    if (!item.SCHILY_fflags.IsEmpty())  _are_SCHILY_fflags = true;
 
     if (item.pax_path_WasUsed)
       _are_pax_path = true;

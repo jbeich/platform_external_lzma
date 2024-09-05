@@ -14,7 +14,7 @@
 namespace NCompress {
 namespace NZ {
 
-static const size_t kBufferSize = 1 << 20;
+static const UInt32 kBufferSize = (1 << 20);
 static const Byte kNumBitsMask = 0x1F;
 static const Byte kBlockModeMask = 0x80;
 static const unsigned kNumMinBits = 9;
@@ -29,15 +29,14 @@ void CDecoder::Free()
 
 CDecoder::~CDecoder() { Free(); }
 
-HRESULT CDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-    ICompressProgressInfo *progress)
+HRESULT CDecoder::CodeReal(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+    const UInt64 * /* inSize */, const UInt64 * /* outSize */, ICompressProgressInfo *progress)
 {
-  try {
-  // PackSize = 0;
-
   CInBuffer inBuffer;
   COutBuffer outBuffer;
 
+  PackSize = 0;
+  
   if (!inBuffer.Create(kBufferSize))
     return E_OUTOFMEMORY;
   inBuffer.SetStream(inStream);
@@ -55,14 +54,14 @@ HRESULT CDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outS
     if (buf[0] != 0x1F || buf[1] != 0x9D)
       return S_FALSE;
   }
-  const Byte prop = buf[2];
+  Byte prop = buf[2];
 
   if ((prop & 0x60) != 0)
     return S_FALSE;
   const unsigned maxbits = prop & kNumBitsMask;
   if (maxbits < kNumMinBits || maxbits > kNumMaxBits)
     return S_FALSE;
-  const UInt32 numItems = (UInt32)1 << maxbits;
+  const UInt32 numItems = 1 << maxbits;
   // Speed optimization: blockSymbol can contain unused velue.
 
   if (maxbits != _numMaxBits || !_parents || !_suffixes || !_stack)
@@ -103,7 +102,7 @@ HRESULT CDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outS
     const unsigned bytePos = bitPos >> 3;
     UInt32 symbol = buf[bytePos] | ((UInt32)buf[(size_t)bytePos + 1] << 8) | ((UInt32)buf[(size_t)bytePos + 2] << 16);
     symbol >>= (bitPos & 7);
-    symbol &= ((UInt32)1 << numBits) - 1;
+    symbol &= (1 << numBits) - 1;
     bitPos += numBits;
     if (bitPos > numBufBits)
       break;
@@ -153,16 +152,19 @@ HRESULT CDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outS
     else
       needPrev = false;
   }
-  // PackSize = inBuffer.GetProcessedSize();
+  PackSize = inBuffer.GetProcessedSize();
   const HRESULT res2 = outBuffer.Flush();
   return (res == S_OK) ? res2 : res;
- 
-  }
+}
+
+Z7_COM7F_IMF(CDecoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+    const UInt64 *inSize, const UInt64 *outSize, ICompressProgressInfo *progress))
+{
+  try { return CodeReal(inStream, outStream, inSize, outSize, progress); }
   catch(const CInBufferException &e) { return e.ErrorCode; }
   catch(const COutBufferException &e) { return e.ErrorCode; }
   catch(...) { return S_FALSE; }
 }
-
 
 bool CheckStream(const Byte *data, size_t size)
 {
@@ -176,7 +178,7 @@ bool CheckStream(const Byte *data, size_t size)
   const unsigned maxbits = prop & kNumBitsMask;
   if (maxbits < kNumMinBits || maxbits > kNumMaxBits)
     return false;
-  const UInt32 numItems = (UInt32)1 << maxbits;
+  const UInt32 numItems = 1 << maxbits;
   const UInt32 blockSymbol = ((prop & kBlockModeMask) != 0) ? 256 : ((UInt32)1 << kNumMaxBits);
   unsigned numBits = kNumMinBits;
   UInt32 head = (blockSymbol == 256) ? 257 : 256;
@@ -200,7 +202,7 @@ bool CheckStream(const Byte *data, size_t size)
     const unsigned bytePos = bitPos >> 3;
     UInt32 symbol = buf[bytePos] | ((UInt32)buf[bytePos + 1] << 8) | ((UInt32)buf[bytePos + 2] << 16);
     symbol >>= (bitPos & 7);
-    symbol &= ((UInt32)1 << numBits) - 1;
+    symbol &= (1 << numBits) - 1;
     bitPos += numBits;
     if (bitPos > numBufBits)
     {

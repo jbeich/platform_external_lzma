@@ -299,9 +299,10 @@ static HRESULT FillProps_from_Coder(IUnknown *coder, CByteBuffer &props)
       writeCoderProperties, coder)
   if (writeCoderProperties)
   {
-    CMyComPtr2_Create<ISequentialOutStream, CDynBufSeqOutStream> outStreamSpec;
+    CDynBufSeqOutStream *outStreamSpec = new CDynBufSeqOutStream;
+    CMyComPtr<ISequentialOutStream> dynOutStream(outStreamSpec);
     outStreamSpec->Init();
-    RINOK(writeCoderProperties->WriteCoderProperties(outStreamSpec))
+    RINOK(writeCoderProperties->WriteCoderProperties(dynOutStream))
     outStreamSpec->CopyToBuffer(props);
   }
   else
@@ -331,8 +332,11 @@ HRESULT CEncoder::Encode1(
   
   RINOK(_mixer->ReInit2())
 
-  CMyComPtr2<ICompressProgressInfo, CMtEncMultiProgress> mtProgress;
-  CMyComPtr2<ISequentialOutStream, CSequentialOutMtNotify> mtOutStreamNotify;
+  CMtEncMultiProgress *mtProgressSpec = NULL;
+  CMyComPtr<ICompressProgressInfo> mtProgress;
+
+  CSequentialOutMtNotify *mtOutStreamNotifySpec = NULL;
+  CMyComPtr<ISequentialOutStream> mtOutStreamNotify;
 
   CRecordVector<CSequentialOutTempBufferImp2 *> tempBufferSpecs;
   CObjectVector<CMyComPtr<ISequentialOutStream> > tempBuffers;
@@ -450,16 +454,18 @@ HRESULT CEncoder::Encode1(
 
   if (useMtProgress)
   {
-    mtProgress.SetFromCls(new CMtEncMultiProgress);
-    mtProgress->Init(compressProgress);
+    mtProgressSpec = new CMtEncMultiProgress;
+    mtProgress = mtProgressSpec;
+    mtProgressSpec->Init(compressProgress);
     
-    mtOutStreamNotify.SetFromCls(new CSequentialOutMtNotify);
-    mtOutStreamNotify->_stream = outStream;
-    mtOutStreamNotify->_mtProgressSpec = mtProgress.ClsPtr();
+    mtOutStreamNotifySpec = new CSequentialOutMtNotify;
+    mtOutStreamNotify = mtOutStreamNotifySpec;
+    mtOutStreamNotifySpec->_stream = outStream;
+    mtOutStreamNotifySpec->_mtProgressSpec = mtProgressSpec;
     
     FOR_VECTOR (t, tempBufferSpecs)
     {
-      tempBufferSpecs[t]->_mtProgressSpec = mtProgress.ClsPtr();
+      tempBufferSpecs[t]->_mtProgressSpec = mtProgressSpec;
     }
   }
   
@@ -468,8 +474,7 @@ HRESULT CEncoder::Encode1(
   {
     outStreamSizeCountSpec = new CSequentialOutStreamSizeCount;
     outStreamSizeCount = outStreamSizeCountSpec;
-    outStreamSizeCountSpec->SetStream(mtOutStreamNotify.IsDefined() ?
-        mtOutStreamNotify.Interface() : outStream);
+    outStreamSizeCountSpec->SetStream(mtOutStreamNotify ? (ISequentialOutStream *)mtOutStreamNotify : outStream);
     outStreamSizeCountSpec->Init();
     outStreamPointers.Add(outStreamSizeCount);
   }
@@ -481,9 +486,8 @@ HRESULT CEncoder::Encode1(
 
   RINOK(_mixer->Code(
       &inStreamPointer,
-      outStreamPointers.ConstData(),
-      mtProgress.IsDefined() ? mtProgress.Interface() :
-        compressProgress, dataAfterEnd_Error))
+      &outStreamPointers.Front(),
+      mtProgress ? (ICompressProgressInfo *)mtProgress : compressProgress, dataAfterEnd_Error))
   
   if (_bindInfo.PackStreams.Size() != 0)
     packSizes.Add(outStreamSizeCountSpec->GetSize());

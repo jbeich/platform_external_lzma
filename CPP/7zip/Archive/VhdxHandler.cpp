@@ -7,8 +7,6 @@
 #include "../../../C/CpuArch.h"
 
 #include "../../Common/ComTry.h"
-#include "../../Common/IntToString.h"
-#include "../../Common/StringToInt.h"
 #include "../../Common/MyBuffer.h"
 
 #include "../../Windows/PropVariant.h"
@@ -33,7 +31,6 @@ EXTERN_C_BEGIN
 // CRC-32C (Castagnoli) : reversed for poly 0x1EDC6F41
 #define k_Crc32c_Poly 0x82f63b78
 
-MY_ALIGN(64)
 static UInt32 g_Crc32c_Table[256];
 
 static void Z7_FASTCALL Crc32c_GenerateTable()
@@ -94,13 +91,31 @@ static bool IsZeroArr(const Byte *p, size_t size)
 }
 
 
+#define ValToHex(t) ((char)(((t) < 10) ? ('0' + (t)) : ('a' + ((t) - 10))))
 
-Z7_FORCE_INLINE
+static void AddByteToHex2(unsigned val, UString &s)
+{
+  unsigned t;
+  t = val >> 4;
+  s += ValToHex(t);
+  t = val & 0xF;
+  s += ValToHex(t);
+}
+
+
+static int HexToVal(const wchar_t c)
+{
+  if (c >= '0' && c <= '9')  return c - '0';
+  if (c >= 'a' && c <= 'z')  return c - 'a' + 10;
+  if (c >= 'A' && c <= 'Z')  return c - 'A' + 10;
+  return -1;
+}
+
 static int DecodeFrom2HexChars(const wchar_t *s)
 {
-  unsigned v0 = (unsigned)s[0];  Z7_PARSE_HEX_DIGIT(v0, return -1;)
-  unsigned v1 = (unsigned)s[1];  Z7_PARSE_HEX_DIGIT(v1, return -1;)
-  return (int)((v0 << 4) | v1);
+  const int v0 = HexToVal(s[0]);  if (v0 < 0)  return -1;
+  const int v1 = HexToVal(s[1]);  if (v1 < 0)  return -1;
+  return (int)(((unsigned)v0 << 4) | (unsigned)v1);
 }
 
 
@@ -146,9 +161,8 @@ struct CGuid
 
 void CGuid::AddHexToString(UString &s) const
 {
-  char temp[sizeof(Data) * 2 + 2];
-  ConvertDataToHex_Lower(temp, Data, sizeof(Data));
-  s += temp;
+  for (unsigned i = 0; i < 16; i++)
+    AddByteToHex2(Data[i], s);
 }
 
 
@@ -260,7 +274,7 @@ struct CRegion
 };
 
 
-static const size_t kRegionSize = 1 << 16;
+static const unsigned kRegionSize = 1 << 16;
 static const unsigned kNumRegionEntriesMax = (1 << 11) - 1;
 
 bool CRegion::Parse(Byte *p)
@@ -1562,7 +1576,7 @@ static void AddComment_Name(UString &s, const char *name)
 static void AddComment_Bool(UString &s, const char *name, bool val)
 {
   AddComment_Name(s, name);
-  s.Add_Char(val ? '+' : '-');
+  s += val ? "+" : "-";
   s.Add_LF();
 }
 

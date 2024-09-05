@@ -15,7 +15,6 @@ IDI_ICON ICON "FM.ico"
 #endif
 
 #include "../FileManager/PropertyName.rc"
-#include "../FileManager/MemDialog.rc"
 #include "../FileManager/OverwriteDialog.rc"
 #include "../FileManager/PasswordDialog.rc"
 #include "../FileManager/ProgressDialog2.rc"

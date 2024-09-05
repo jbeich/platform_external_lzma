@@ -197,7 +197,7 @@ static void AddProp_Size(CObjectVector<CProperty> &properties, const char *name,
 {
   UString s;
   s.Add_UInt64(size);
-  s.Add_Char('b');
+  s += 'b';
   AddProp_UString(properties, name, s);
 }
 
@@ -265,7 +265,7 @@ static void SetOutProperties(
       UString s;
       // s += 'p'; // for debug: alternate percent method
       s.Add_UInt64(memUse.Val);
-      s.Add_Char('%');
+      s += '%';
       AddProp_UString(properties, kMemUse, s);
     }
     else

@@ -12,8 +12,10 @@ namespace NZ {
 
 // Z decoder decodes Z data stream, including 3 bytes of header.
   
-class CDecoder
-{
+Z7_CLASS_IMP_COM_1(
+  CDecoder
+  , ICompressCoder
+)
   UInt16 *_parents;
   Byte *_suffixes;
   Byte *_stack;
@@ -23,10 +25,10 @@ public:
   CDecoder(): _parents(NULL), _suffixes(NULL), _stack(NULL), /* _prop(0), */ _numMaxBits(0) {}
   ~CDecoder();
   void Free();
-  // UInt64 PackSize;
+  UInt64 PackSize;
 
-  HRESULT Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-    ICompressProgressInfo *progress);
+  HRESULT CodeReal(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+      const UInt64 *inSize, const UInt64 *outSize, ICompressProgressInfo *progress);
 };
 
 /*
