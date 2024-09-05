@@ -11,7 +11,7 @@
 #include "../../../Windows/ErrorMsg.h"
 #include "../../../Windows/PropVariantConv.h"
 
-#ifndef Z7_ST
+#ifndef _7ZIP_ST
 #include "../../../Windows/Synchronization.h"
 #endif
 
@@ -56,9 +56,6 @@ HRESULT CExtractScanConsole::ScanProgress(const CDirItemsStat &st, const FString
 
 HRESULT CExtractScanConsole::ScanError(const FString &path, DWORD systemError)
 {
-  // 22.00:
-  // ScanErrors.AddError(path, systemError);
-
   ClosePercentsAndFlush();
   
   if (_se)
@@ -69,14 +66,9 @@ HRESULT CExtractScanConsole::ScanError(const FString &path, DWORD systemError)
     _se->Flush();
   }
   return HRESULT_FROM_WIN32(systemError);
-
-  // 22.00: commented
-  // CommonError(path, systemError, true);
-  // return S_OK;
 }
 
 
-void Print_UInt64_and_String(AString &s, UInt64 val, const char *name);
 void Print_UInt64_and_String(AString &s, UInt64 val, const char *name)
 {
   char temp[32];
@@ -86,7 +78,6 @@ void Print_UInt64_and_String(AString &s, UInt64 val, const char *name)
   s += name;
 }
 
-void PrintSize_bytes_Smart(AString &s, UInt64 val);
 void PrintSize_bytes_Smart(AString &s, UInt64 val)
 {
   Print_UInt64_and_String(s, val, "bytes");
@@ -105,7 +96,7 @@ void PrintSize_bytes_Smart(AString &s, UInt64 val)
   s += ')';
 }
 
-static void PrintSize_bytes_Smart_comma(AString &s, UInt64 val)
+void PrintSize_bytes_Smart_comma(AString &s, UInt64 val)
 {
   if (val == (UInt64)(Int64)-1)
     return;
@@ -115,7 +106,6 @@ static void PrintSize_bytes_Smart_comma(AString &s, UInt64 val)
 
 
 
-void Print_DirItemsStat(AString &s, const CDirItemsStat &st);
 void Print_DirItemsStat(AString &s, const CDirItemsStat &st)
 {
   if (st.NumDirs != 0)
@@ -134,7 +124,6 @@ void Print_DirItemsStat(AString &s, const CDirItemsStat &st)
 }
 
 
-void Print_DirItemsStat2(AString &s, const CDirItemsStat2 &st);
 void Print_DirItemsStat2(AString &s, const CDirItemsStat2 &st)
 {
   Print_DirItemsStat(s, (CDirItemsStat &)st);
@@ -183,7 +172,7 @@ void CExtractScanConsole::PrintStat(const CDirItemsStat &st)
 
 
 
-#ifndef Z7_ST
+#ifndef _7ZIP_ST
 static NSynchronization::CCriticalSection g_CriticalSection;
 #define MT_LOCK NSynchronization::CCriticalSectionLock lock(g_CriticalSection);
 #else
@@ -194,11 +183,10 @@ static NSynchronization::CCriticalSection g_CriticalSection;
 static const char * const kTestString    =  "T";
 static const char * const kExtractString =  "-";
 static const char * const kSkipString    =  ".";
-static const char * const kReadString    =  "H";
 
-// static const char * const kCantAutoRename = "cannot create file with auto name\n";
-// static const char * const kCantRenameFile = "cannot rename existing file\n";
-// static const char * const kCantDeleteOutputFile = "cannot delete output file ";
+// static const char * const kCantAutoRename = "can not create file with auto name\n";
+// static const char * const kCantRenameFile = "can not rename existing file\n";
+// static const char * const kCantDeleteOutputFile = "can not delete output file ";
 
 static const char * const kMemoryExceptionMessage = "Can't allocate required memory!";
 
@@ -235,7 +223,7 @@ static const char * const k_ErrorFlagsMessages[] =
   , "CRC Error"
 };
 
-Z7_COM7F_IMF(CExtractCallbackConsole::SetTotal(UInt64 size))
+STDMETHODIMP CExtractCallbackConsole::SetTotal(UInt64 size)
 {
   MT_LOCK
 
@@ -247,7 +235,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::SetTotal(UInt64 size))
   return CheckBreak2();
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::SetCompleted(const UInt64 *completeValue))
+STDMETHODIMP CExtractCallbackConsole::SetCompleted(const UInt64 *completeValue)
 {
   MT_LOCK
 
@@ -281,14 +269,14 @@ static void PrintFileInfo(CStdOutStream *_so, const wchar_t *path, const FILETIM
   }
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::AskOverwrite(
+STDMETHODIMP CExtractCallbackConsole::AskOverwrite(
     const wchar_t *existName, const FILETIME *existTime, const UInt64 *existSize,
     const wchar_t *newName, const FILETIME *newTime, const UInt64 *newSize,
-    Int32 *answer))
+    Int32 *answer)
 {
   MT_LOCK
   
-  RINOK(CheckBreak2())
+  RINOK(CheckBreak2());
 
   ClosePercentsAndFlush();
 
@@ -302,7 +290,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::AskOverwrite(
   
   NUserAnswerMode::EEnum overwriteAnswer = ScanUserYesNoAllQuit(_so);
   
-  switch ((int)overwriteAnswer)
+  switch (overwriteAnswer)
   {
     case NUserAnswerMode::kQuit:  return E_ABORT;
     case NUserAnswerMode::kNo:     *answer = NOverwriteAnswer::kNo; break;
@@ -325,7 +313,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::AskOverwrite(
   return CheckBreak2();
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::PrepareOperation(const wchar_t *name, Int32 isFolder, Int32 askExtractMode, const UInt64 *position))
+STDMETHODIMP CExtractCallbackConsole::PrepareOperation(const wchar_t *name, Int32 /* isFolder */, Int32 askExtractMode, const UInt64 *position)
 {
   MT_LOCK
   
@@ -339,9 +327,8 @@ Z7_COM7F_IMF(CExtractCallbackConsole::PrepareOperation(const wchar_t *name, Int3
     case NArchive::NExtract::NAskMode::kExtract: s = kExtractString; break;
     case NArchive::NExtract::NAskMode::kTest:    s = kTestString; break;
     case NArchive::NExtract::NAskMode::kSkip:    s = kSkipString; requiredLevel = 2; break;
-    case NArchive::NExtract::NAskMode::kReadExternal: s = kReadString; requiredLevel = 0; break;
     default: s = "???"; requiredLevel = 2;
-  }
+  };
 
   bool show2 = (LogLevel >= requiredLevel && _so);
 
@@ -359,12 +346,6 @@ Z7_COM7F_IMF(CExtractCallbackConsole::PrepareOperation(const wchar_t *name, Int3
     {
       _tempU = name;
       _so->Normalize_UString(_tempU);
-      // 21.04
-      if (isFolder)
-      {
-        if (!_tempU.IsEmpty() && _tempU.Back() != WCHAR_PATH_SEPARATOR)
-          _tempU.Add_PathSepar();
-      }
     }
     _so->PrintUString(_tempU, _tempA);
     if (position)
@@ -394,11 +375,11 @@ Z7_COM7F_IMF(CExtractCallbackConsole::PrepareOperation(const wchar_t *name, Int3
   return CheckBreak2();
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::MessageError(const wchar_t *message))
+STDMETHODIMP CExtractCallbackConsole::MessageError(const wchar_t *message)
 {
   MT_LOCK
   
-  RINOK(CheckBreak2())
+  RINOK(CheckBreak2());
 
   NumFileErrors_in_Current++;
   NumFileErrors++;
@@ -413,7 +394,6 @@ Z7_COM7F_IMF(CExtractCallbackConsole::MessageError(const wchar_t *message))
   return CheckBreak2();
 }
 
-void SetExtractErrorMessage(Int32 opRes, Int32 encrypted, AString &dest);
 void SetExtractErrorMessage(Int32 opRes, Int32 encrypted, AString &dest)
 {
   dest.Empty();
@@ -456,11 +436,11 @@ void SetExtractErrorMessage(Int32 opRes, Int32 encrypted, AString &dest)
     else
     {
       dest += "Error #";
-      dest.Add_UInt32((UInt32)opRes);
+      dest.Add_UInt32(opRes);
     }
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::SetOperationResult(Int32 opRes, Int32 encrypted))
+STDMETHODIMP CExtractCallbackConsole::SetOperationResult(Int32 opRes, Int32 encrypted)
 {
   MT_LOCK
   
@@ -499,7 +479,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::SetOperationResult(Int32 opRes, Int32 encr
   return CheckBreak2();
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::ReportExtractResult(Int32 opRes, Int32 encrypted, const wchar_t *name))
+STDMETHODIMP CExtractCallbackConsole::ReportExtractResult(Int32 opRes, Int32 encrypted, const wchar_t *name)
 {
   if (opRes != NArchive::NExtract::NOperationResult::kOK)
   {
@@ -512,7 +492,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::ReportExtractResult(Int32 opRes, Int32 enc
 
 
 
-#ifndef Z7_NO_CRYPTO
+#ifndef _NO_CRYPTO
 
 HRESULT CExtractCallbackConsole::SetPassword(const UString &password)
 {
@@ -521,7 +501,7 @@ HRESULT CExtractCallbackConsole::SetPassword(const UString &password)
   return S_OK;
 }
 
-Z7_COM7F_IMF(CExtractCallbackConsole::CryptoGetTextPassword(BSTR *password))
+STDMETHODIMP CExtractCallbackConsole::CryptoGetTextPassword(BSTR *password)
 {
   COM_TRY_BEGIN
   MT_LOCK
@@ -533,7 +513,7 @@ Z7_COM7F_IMF(CExtractCallbackConsole::CryptoGetTextPassword(BSTR *password))
 
 HRESULT CExtractCallbackConsole::BeforeOpen(const wchar_t *name, bool testMode)
 {
-  RINOK(CheckBreak2())
+  RINOK(CheckBreak2());
 
   NumTryArcs++;
   ThereIsError_in_Current = false;
@@ -560,7 +540,7 @@ static AString GetOpenArcErrorMessage(UInt32 errorFlags)
 {
   AString s;
   
-  for (unsigned i = 0; i < Z7_ARRAY_SIZE(k_ErrorFlagsMessages); i++)
+  for (unsigned i = 0; i < ARRAY_SIZE(k_ErrorFlagsMessages); i++)
   {
     UInt32 f = (1 << i);
     if ((errorFlags & f) == 0)
@@ -586,7 +566,6 @@ static AString GetOpenArcErrorMessage(UInt32 errorFlags)
   return s;
 }
 
-void PrintErrorFlags(CStdOutStream &so, const char *s, UInt32 errorFlags);
 void PrintErrorFlags(CStdOutStream &so, const char *s, UInt32 errorFlags)
 {
   if (errorFlags == 0)
@@ -594,7 +573,7 @@ void PrintErrorFlags(CStdOutStream &so, const char *s, UInt32 errorFlags)
   so << s << endl << GetOpenArcErrorMessage(errorFlags) << endl;
 }
 
-static void Add_Messsage_Pre_ArcType(UString &s, const char *pre, const wchar_t *arcType)
+void Add_Messsage_Pre_ArcType(UString &s, const char *pre, const wchar_t *arcType)
 {
   s.Add_LF();
   s += pre;
@@ -603,7 +582,6 @@ static void Add_Messsage_Pre_ArcType(UString &s, const char *pre, const wchar_t 
   s += "] archive";
 }
 
-void Print_ErrorFormatIndex_Warning(CStdOutStream *_so, const CCodecs *codecs, const CArc &arc);
 void Print_ErrorFormatIndex_Warning(CStdOutStream *_so, const CCodecs *codecs, const CArc &arc)
 {
   const CArcErrorInfo &er = arc.ErrorInfo;
@@ -618,7 +596,7 @@ void Print_ErrorFormatIndex_Warning(CStdOutStream *_so, const CCodecs *codecs, c
   }
   else
   {
-    Add_Messsage_Pre_ArcType(s, "Cannot open the file", codecs->GetFormatNamePtr(er.ErrorFormatIndex));
+    Add_Messsage_Pre_ArcType(s, "Can not open the file", codecs->GetFormatNamePtr(er.ErrorFormatIndex));
     Add_Messsage_Pre_ArcType(s, "The file is open", codecs->GetFormatNamePtr(arc.FormatIndex));
   }
   
@@ -739,7 +717,7 @@ HRESULT CExtractCallbackConsole::OpenResult(
   {
     if (_so)
     {
-      RINOK(Print_OpenArchive_Props(*_so, codecs, arcLink))
+      RINOK(Print_OpenArchive_Props(*_so, codecs, arcLink));
       *_so << endl;
     }
   }
@@ -753,8 +731,8 @@ HRESULT CExtractCallbackConsole::OpenResult(
       *_se << kError;
       _se->NormalizePrint_wstr(name);
       *_se << endl;
-      const HRESULT res = Print_OpenArchive_Error(*_se, codecs, arcLink);
-      RINOK(res)
+      HRESULT res = Print_OpenArchive_Error(*_se, codecs, arcLink);
+      RINOK(res);
       if (result == S_FALSE)
       {
       }
@@ -828,9 +806,7 @@ HRESULT CExtractCallbackConsole::ExtractResult(HRESULT result)
   else
   {
     NumArcsWithError++;
-    if (result == E_ABORT
-        || result == HRESULT_FROM_WIN32(ERROR_DISK_FULL)
-        )
+    if (result == E_ABORT || result == ERROR_DISK_FULL)
       return result;
     
     if (_se)

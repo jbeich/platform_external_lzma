@@ -3,9 +3,9 @@ MY_CONSOLE = 1
 MY_FIXED = 1
 
 CFLAGS = $(CFLAGS) \
-  -DZ7_EXTRACT_ONLY \
-  -DZ7_NO_READ_FROM_CODER \
-  -DZ7_SFX \
+  -DEXTRACT_ONLY \
+  -DNO_READ_FROM_CODER \
+  -D_SFX \
 
 CURRENT_OBJS = \
   $O\SfxCon.obj \
@@ -29,8 +29,8 @@ COMMON_OBJS = \
   $O\StdInStream.obj \
   $O\StdOutStream.obj \
   $O\StringConvert.obj \
-  $O\UTFConvert.obj \
   $O\Wildcard.obj \
+  $O\UTFConvert.obj \
 
 WIN_OBJS = \
   $O\DLL.obj \
@@ -64,9 +64,9 @@ UI_COMMON_OBJS = \
   $O\ArchiveExtractCallback.obj \
   $O\ArchiveOpenCallback.obj \
   $O\DefaultName.obj \
+  $O\LoadCodecs.obj \
   $O\Extract.obj \
   $O\ExtractingFilePath.obj \
-  $O\LoadCodecs.obj \
   $O\OpenArchive.obj \
   $O\PropIDUtils.obj \
 
@@ -78,6 +78,7 @@ AR_COMMON_OBJS = \
   $O\ItemNameUtils.obj \
   $O\MultiStream.obj \
   $O\OutStreamWithCRC.obj \
+
 
 7Z_OBJS = \
   $O\7zDecode.obj \
@@ -109,7 +110,6 @@ CRYPTO_OBJS = \
   $O\MyAes.obj \
 
 C_OBJS = \
-  $O\7zStream.obj \
   $O\Alloc.obj \
   $O\Bcj2.obj \
   $O\Bra.obj \
@@ -124,11 +124,11 @@ C_OBJS = \
   $O\MtDec.obj \
   $O\Ppmd7.obj \
   $O\Ppmd7Dec.obj \
+  $O\Sha256.obj \
   $O\Threads.obj \
 
 !include "../../Aes.mak"
 !include "../../Crc.mak"
 !include "../../LzmaDec.mak"
-!include "../../Sha256.mak"
 
 !include "../../7zip.mak"

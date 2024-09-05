@@ -15,7 +15,9 @@
 namespace NCompress {
 
 namespace NLzma2 {
+
 HRESULT SetLzma2Prop(PROPID propID, const PROPVARIANT &prop, CLzma2EncProps &lzma2Props);
+
 }
 
 namespace NXz {
@@ -61,7 +63,7 @@ static const CMethodNamePair g_NamePairs[] =
 
 static int FilterIdFromName(const wchar_t *name)
 {
-  for (unsigned i = 0; i < Z7_ARRAY_SIZE(g_NamePairs); i++)
+  for (unsigned i = 0; i < ARRAY_SIZE(g_NamePairs); i++)
   {
     const CMethodNamePair &pair = g_NamePairs[i];
     if (StringsAreEqualNoCase_Ascii(name, pair.Name))
@@ -128,7 +130,7 @@ HRESULT CEncoder::SetCoderProp(PROPID propID, const PROPVARIANT &prop)
   {
     if (prop.vt == VT_UI4)
     {
-      const UInt32 id32 = prop.ulVal;
+      UInt32 id32 = prop.ulVal;
       if (id32 == XZ_ID_Delta)
         return E_INVALIDARG;
       xzProps.filterProps.id = prop.ulVal;
@@ -154,20 +156,20 @@ HRESULT CEncoder::SetCoderProp(PROPID propID, const PROPVARIANT &prop)
         }
         else
         {
-          const int filterId = FilterIdFromName(prop.bstrVal);
+          int filterId = FilterIdFromName(prop.bstrVal);
           if (filterId < 0 /* || filterId == XZ_ID_LZMA2 */)
             return E_INVALIDARG;
-          id32 = (unsigned)filterId;
+          id32 = filterId;
         }
       }
       
       if (id32 == XZ_ID_Delta)
       {
-        const wchar_t c = *name;
+        wchar_t c = *name;
         if (c != '-' && c != ':')
           return E_INVALIDARG;
         name++;
-        const UInt32 delta = ConvertStringToUInt32(name, &end);
+        UInt32 delta = ConvertStringToUInt32(name, &end);
         if (end == name || *end != 0 || delta == 0 || delta > 256)
           return E_INVALIDARG;
         xzProps.filterProps.delta = delta;
@@ -183,14 +185,14 @@ HRESULT CEncoder::SetCoderProp(PROPID propID, const PROPVARIANT &prop)
 }
 
 
-Z7_COM7F_IMF(CEncoder::SetCoderProperties(const PROPID *propIDs,
-    const PROPVARIANT *coderProps, UInt32 numProps))
+STDMETHODIMP CEncoder::SetCoderProperties(const PROPID *propIDs,
+    const PROPVARIANT *coderProps, UInt32 numProps)
 {
   XzProps_Init(&xzProps);
 
   for (UInt32 i = 0; i < numProps; i++)
   {
-    RINOK(SetCoderProp(propIDs[i], coderProps[i]))
+    RINOK(SetCoderProp(propIDs[i], coderProps[i]));
   }
   
   return S_OK;
@@ -198,13 +200,13 @@ Z7_COM7F_IMF(CEncoder::SetCoderProperties(const PROPID *propIDs,
 }
 
 
-Z7_COM7F_IMF(CEncoder::SetCoderPropertiesOpt(const PROPID *propIDs,
-    const PROPVARIANT *coderProps, UInt32 numProps))
+STDMETHODIMP CEncoder::SetCoderPropertiesOpt(const PROPID *propIDs,
+    const PROPVARIANT *coderProps, UInt32 numProps)
 {
   for (UInt32 i = 0; i < numProps; i++)
   {
     const PROPVARIANT &prop = coderProps[i];
-    const PROPID propID = propIDs[i];
+    PROPID propID = propIDs[i];
     if (propID == NCoderPropID::kExpectedDataSize)
       if (prop.vt == VT_UI8)
         XzEnc_SetDataSize(_encoder, prop.uhVal.QuadPart);
@@ -216,8 +218,8 @@ Z7_COM7F_IMF(CEncoder::SetCoderPropertiesOpt(const PROPID *propIDs,
 #define RET_IF_WRAP_ERROR(wrapRes, sRes, sResErrorCode) \
   if (wrapRes != S_OK /* && (sRes == SZ_OK || sRes == sResErrorCode) */) return wrapRes;
 
-Z7_COM7F_IMF(CEncoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
-    const UInt64 * /* inSize */, const UInt64 * /* outSize */, ICompressProgressInfo *progress))
+STDMETHODIMP CEncoder::Code(ISequentialInStream *inStream, ISequentialOutStream *outStream,
+    const UInt64 * /* inSize */, const UInt64 * /* outSize */, ICompressProgressInfo *progress)
 {
   CSeqInStreamWrap inWrap;
   CSeqOutStreamWrap outWrap;
