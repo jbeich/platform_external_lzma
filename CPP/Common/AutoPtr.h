@@ -1,45 +1,34 @@
 // Common/AutoPtr.h
 
-#ifndef ZIP7_INC_COMMON_AUTOPTR_H
-#define ZIP7_INC_COMMON_AUTOPTR_H
+#ifndef __COMMON_AUTOPTR_H
+#define __COMMON_AUTOPTR_H
 
-template<class T> class CMyUniquePtr
-// CMyAutoPtr
+template<class T> class CMyAutoPtr
 {
   T *_p;
-  
-  CMyUniquePtr(CMyUniquePtr<T>& p); // : _p(p.release()) {}
-  CMyUniquePtr<T>& operator=(T *p);
-  CMyUniquePtr<T>& operator=(CMyUniquePtr<T>& p);
-  /*
+public:
+  CMyAutoPtr(T *p = 0) : _p(p) {}
+  CMyAutoPtr(CMyAutoPtr<T>& p): _p(p.release()) {}
+  CMyAutoPtr<T>& operator=(CMyAutoPtr<T>& p)
   {
     reset(p.release());
     return (*this);
   }
-  */
-  void reset(T* p = NULL)
-  {
-    if (p != _p)
-      delete _p;
-    _p = p;
-  }
-public:
-  CMyUniquePtr(T *p = NULL) : _p(p) {}
-  ~CMyUniquePtr() { delete _p; }
+  ~CMyAutoPtr() { delete _p; }
   T& operator*() const { return *_p; }
-  T* operator->() const { return _p; }
-  // operator bool() const { return _p != NULL; }
+  // T* operator->() const { return (&**this); }
   T* get() const { return _p; }
   T* release()
   {
     T *tmp = _p;
-    _p = NULL;
+    _p = 0;
     return tmp;
   }
-  void Create_if_Empty()
+  void reset(T* p = 0)
   {
-    if (!_p)
-      _p = new T;
+    if (p != _p)
+      delete _p;
+    _p = p;
   }
 };
 

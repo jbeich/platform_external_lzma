@@ -1,26 +1,26 @@
 // 7z/Handler.h
 
-#ifndef ZIP7_7Z_HANDLER_H
-#define ZIP7_7Z_HANDLER_H
+#ifndef __7Z_HANDLER_H
+#define __7Z_HANDLER_H
 
 #include "../../ICoder.h"
 #include "../IArchive.h"
 
 #include "../../Common/CreateCoder.h"
 
-#ifndef Z7_7Z_SET_PROPERTIES
+#ifndef __7Z_SET_PROPERTIES
 
-#ifdef Z7_EXTRACT_ONLY
-  #if !defined(Z7_ST) && !defined(Z7_SFX)
-    #define Z7_7Z_SET_PROPERTIES
+#ifdef EXTRACT_ONLY
+  #if !defined(_7ZIP_ST) && !defined(_SFX)
+    #define __7Z_SET_PROPERTIES
   #endif
 #else
-  #define Z7_7Z_SET_PROPERTIES
+  #define __7Z_SET_PROPERTIES
 #endif
 
 #endif
 
-// #ifdef Z7_7Z_SET_PROPERTIES
+// #ifdef __7Z_SET_PROPERTIES
 #include "../Common/HandlerOut.h"
 // #endif
 
@@ -31,7 +31,7 @@ namespace NArchive {
 namespace N7z {
 
 
-#ifndef Z7_EXTRACT_ONLY
+#ifndef EXTRACT_ONLY
 
 class COutHandler: public CMultiMethodProps
 {
@@ -49,18 +49,17 @@ public:
   bool _encryptHeaders;
   // bool _useParents; 9.26
 
-  CHandlerTimeOptions TimeOptions;
-
+  CBoolPair Write_CTime;
+  CBoolPair Write_ATime;
+  CBoolPair Write_MTime;
   CBoolPair Write_Attrib;
 
   bool _useMultiThreadMixer;
+
   bool _removeSfxBlock;
+  
   // bool _volumeMode;
 
-  UInt32 _decoderCompatibilityVersion;
-  CUIntVector _enabledFilters;
-  CUIntVector _disabledFilters;
-  
   void InitSolidFiles() { _numSolidFiles = (UInt64)(Int64)(-1); }
   void InitSolidSize()  { _numSolidBytes = (UInt64)(Int64)(-1); }
   void InitSolid()
@@ -81,63 +80,69 @@ public:
 
 #endif
 
-class CHandler Z7_final:
+class CHandler:
   public IInArchive,
   public IArchiveGetRawProps,
   
-  #ifdef Z7_7Z_SET_PROPERTIES
+  #ifdef __7Z_SET_PROPERTIES
   public ISetProperties,
   #endif
   
-  #ifndef Z7_EXTRACT_ONLY
+  #ifndef EXTRACT_ONLY
   public IOutArchive,
   #endif
   
-  Z7_PUBLIC_ISetCompressCodecsInfo_IFEC
+  PUBLIC_ISetCompressCodecsInfo
   
   public CMyUnknownImp,
 
-  #ifndef Z7_EXTRACT_ONLY
+  #ifndef EXTRACT_ONLY
     public COutHandler
   #else
     public CCommonMethodProps
   #endif
 {
-  Z7_COM_QI_BEGIN2(IInArchive)
-  Z7_COM_QI_ENTRY(IArchiveGetRawProps)
- #ifdef Z7_7Z_SET_PROPERTIES
-  Z7_COM_QI_ENTRY(ISetProperties)
- #endif
- #ifndef Z7_EXTRACT_ONLY
-  Z7_COM_QI_ENTRY(IOutArchive)
- #endif
-  Z7_COM_QI_ENTRY_ISetCompressCodecsInfo_IFEC
-  Z7_COM_QI_END
-  Z7_COM_ADDREF_RELEASE
+public:
+  MY_QUERYINTERFACE_BEGIN2(IInArchive)
+  MY_QUERYINTERFACE_ENTRY(IArchiveGetRawProps)
+  #ifdef __7Z_SET_PROPERTIES
+  MY_QUERYINTERFACE_ENTRY(ISetProperties)
+  #endif
+  #ifndef EXTRACT_ONLY
+  MY_QUERYINTERFACE_ENTRY(IOutArchive)
+  #endif
+  QUERY_ENTRY_ISetCompressCodecsInfo
+  MY_QUERYINTERFACE_END
+  MY_ADDREF_RELEASE
 
-  Z7_IFACE_COM7_IMP(IInArchive)
-  Z7_IFACE_COM7_IMP(IArchiveGetRawProps)
- #ifdef Z7_7Z_SET_PROPERTIES
-  Z7_IFACE_COM7_IMP(ISetProperties)
- #endif
- #ifndef Z7_EXTRACT_ONLY
-  Z7_IFACE_COM7_IMP(IOutArchive)
- #endif
+  INTERFACE_IInArchive(;)
+  INTERFACE_IArchiveGetRawProps(;)
+
+  #ifdef __7Z_SET_PROPERTIES
+  STDMETHOD(SetProperties)(const wchar_t * const *names, const PROPVARIANT *values, UInt32 numProps);
+  #endif
+
+  #ifndef EXTRACT_ONLY
+  INTERFACE_IOutArchive(;)
+  #endif
+
   DECL_ISetCompressCodecsInfo
+
+  CHandler();
 
 private:
   CMyComPtr<IInStream> _inStream;
   NArchive::N7z::CDbEx _db;
   
- #ifndef Z7_NO_CRYPTO
+  #ifndef _NO_CRYPTO
   bool _isEncrypted;
   bool _passwordIsDefined;
-  UString _password; // _Wipe
- #endif
+  UString _password;
+  #endif
 
-  #ifdef Z7_EXTRACT_ONLY
+  #ifdef EXTRACT_ONLY
   
-  #ifdef Z7_7Z_SET_PROPERTIES
+  #ifdef __7Z_SET_PROPERTIES
   bool _useMultiThreadMixer;
   #endif
 
@@ -149,12 +154,17 @@ private:
 
   HRESULT PropsMethod_To_FullMethod(CMethodFull &dest, const COneMethodInfo &m);
   HRESULT SetHeaderMethod(CCompressionMethodMode &headerMethod);
-  HRESULT SetMainMethod(CCompressionMethodMode &method);
+  HRESULT SetMainMethod(CCompressionMethodMode &method
+      #ifndef _7ZIP_ST
+      , UInt32 numThreads
+      #endif
+      );
+
 
   #endif
 
   bool IsFolderEncrypted(CNum folderIndex) const;
-  #ifndef Z7_SFX
+  #ifndef _SFX
 
   CRecordVector<UInt64> _fileInfoPopIDs;
   void FillPopIDs();
@@ -164,13 +174,6 @@ private:
   #endif
 
   DECL_EXTERNAL_CODECS_VARS
-
-public:
-  CHandler();
-  ~CHandler()
-  {
-    Close();
-  }
 };
 
 }}

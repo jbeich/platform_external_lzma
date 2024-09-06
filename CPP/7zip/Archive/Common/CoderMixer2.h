@@ -1,7 +1,7 @@
 // CoderMixer2.h
 
-#ifndef ZIP7_INC_CODER_MIXER2_H
-#define ZIP7_INC_CODER_MIXER2_H
+#ifndef __CODER_MIXER2_H
+#define __CODER_MIXER2_H
 
 #include "../../../Common/MyCom.h"
 #include "../../../Common/MyVector.h"
@@ -10,11 +10,11 @@
 
 #include "../../Common/CreateCoder.h"
 
-#ifdef Z7_ST
+#ifdef _7ZIP_ST
   #define USE_MIXER_ST
 #else
   #define USE_MIXER_MT
-  #ifndef Z7_SFX
+  #ifndef _SFX
     #define USE_MIXER_ST
   #endif
 #endif
@@ -28,13 +28,18 @@
 
 #ifdef USE_MIXER_ST
 
-Z7_CLASS_IMP_COM_1(
-  CSequentialInStreamCalcSize
-  , ISequentialInStream
-)
-  bool _wasFinished;
+class CSequentialInStreamCalcSize:
+  public ISequentialInStream,
+  public CMyUnknownImp
+{
+public:
+  MY_UNKNOWN_IMP1(ISequentialInStream)
+
+  STDMETHOD(Read)(void *data, UInt32 size, UInt32 *processedSize);
+private:
   CMyComPtr<ISequentialInStream> _stream;
   UInt64 _size;
+  bool _wasFinished;
 public:
   void SetStream(ISequentialInStream *stream) { _stream = stream;  }
   void Init()
@@ -48,14 +53,19 @@ public:
 };
 
 
-Z7_CLASS_IMP_COM_2(
-  COutStreamCalcSize
-  , ISequentialOutStream
-  , IOutStreamFinish
-)
+class COutStreamCalcSize:
+  public ISequentialOutStream,
+  public IOutStreamFinish,
+  public CMyUnknownImp
+{
   CMyComPtr<ISequentialOutStream> _stream;
   UInt64 _size;
 public:
+  MY_UNKNOWN_IMP2(ISequentialOutStream, IOutStreamFinish)
+  
+  STDMETHOD(Write)(const void *data, UInt32 size, UInt32 *processedSize);
+  STDMETHOD(OutStreamFinish)();
+  
   void SetStream(ISequentialOutStream *stream) { _stream = stream; }
   void ReleaseStream() { _stream.Release(); }
   void Init() { _size = 0; }
@@ -97,7 +107,7 @@ struct CBindInfo
   {
     FOR_VECTOR (i, Bonds)
       if (Bonds[i].PackIndex == packStream)
-        return (int)i;
+        return i;
     return -1;
   }
 
@@ -105,14 +115,14 @@ struct CBindInfo
   {
     FOR_VECTOR (i, Bonds)
       if (Bonds[i].UnpackIndex == unpackStream)
-        return (int)i;
+        return i;
     return -1;
   }
 
   bool SetUnpackCoder()
   {
     bool isOk = false;
-    FOR_VECTOR (i, Coders)
+    FOR_VECTOR(i, Coders)
     {
       if (FindBond_for_UnpackStream(i) < 0)
       {
@@ -132,9 +142,9 @@ struct CBindInfo
 
   int FindStream_in_PackStreams(UInt32 streamIndex) const
   {
-    FOR_VECTOR (i, PackStreams)
+    FOR_VECTOR(i, PackStreams)
       if (PackStreams[i] == streamIndex)
-        return (int)i;
+        return i;
     return -1;
   }
 
@@ -179,18 +189,19 @@ struct CBindInfo
 
 class CCoder
 {
-  Z7_CLASS_NO_COPY(CCoder)
+  CLASS_NO_COPY(CCoder);
 public:
   CMyComPtr<ICompressCoder> Coder;
   CMyComPtr<ICompressCoder2> Coder2;
   UInt32 NumStreams;
-  bool Finish;
 
   UInt64 UnpackSize;
   const UInt64 *UnpackSizePointer;
 
   CRecordVector<UInt64> PackSizes;
   CRecordVector<const UInt64 *> PackSizePointers;
+
+  bool Finish;
 
   CCoder(): Finish(false) {}
 
@@ -240,7 +251,6 @@ public:
       // , InternalPackSizeError(false)
       {}
 
-  virtual ~CMixer() {}
   /*
   Sequence of calling:
 
@@ -269,7 +279,7 @@ public:
   virtual void AddCoder(const CCreatedCoder &cod) = 0;
   virtual CCoder &GetCoder(unsigned index) = 0;
   virtual void SelectMainCoder(bool useFirst) = 0;
-  virtual HRESULT ReInit2() = 0;
+  virtual void ReInit() = 0;
   virtual void SetCoderInfo(unsigned coderIndex, const UInt64 *unpackSize, const UInt64 * const *packSizes, bool finish) = 0;
   virtual HRESULT Code(
       ISequentialInStream * const *inStreams,
@@ -312,9 +322,6 @@ class CMixerST:
   public CMixer,
   public CMyUnknownImp
 {
-  Z7_COM_UNKNOWN_IMP_0
-  Z7_CLASS_NO_COPY(CMixerST)
-
   HRESULT GetInStream2(ISequentialInStream * const *inStreams, /* const UInt64 * const *inSizes, */
       UInt32 outStreamIndex, ISequentialInStream **inStreamRes);
   HRESULT GetInStream(ISequentialInStream * const *inStreams, /* const UInt64 * const *inSizes, */
@@ -330,21 +337,23 @@ public:
   
   CObjectVector<CStBinderStream> _binderStreams;
 
-  CMixerST(bool encodeMode);
-  ~CMixerST() Z7_DESTRUCTOR_override;
+  MY_UNKNOWN_IMP
 
-  virtual void AddCoder(const CCreatedCoder &cod) Z7_override;
-  virtual CCoder &GetCoder(unsigned index) Z7_override;
-  virtual void SelectMainCoder(bool useFirst) Z7_override;
-  virtual HRESULT ReInit2() Z7_override;
-  virtual void SetCoderInfo(unsigned coderIndex, const UInt64 *unpackSize, const UInt64 * const *packSizes, bool finish) Z7_override
+  CMixerST(bool encodeMode);
+  ~CMixerST();
+
+  virtual void AddCoder(const CCreatedCoder &cod);
+  virtual CCoder &GetCoder(unsigned index);
+  virtual void SelectMainCoder(bool useFirst);
+  virtual void ReInit();
+  virtual void SetCoderInfo(unsigned coderIndex, const UInt64 *unpackSize, const UInt64 * const *packSizes, bool finish)
     { _coders[coderIndex].SetCoderInfo(unpackSize, packSizes, finish); }
   virtual HRESULT Code(
       ISequentialInStream * const *inStreams,
       ISequentialOutStream * const *outStreams,
       ICompressProgressInfo *progress,
-      bool &dataAfterEnd_Error) Z7_override;
-  virtual UInt64 GetBondStreamSize(unsigned bondIndex) const Z7_override;
+      bool &dataAfterEnd_Error);
+  virtual UInt64 GetBondStreamSize(unsigned bondIndex) const;
 
   HRESULT GetMainUnpackStream(
       ISequentialInStream * const *inStreams,
@@ -360,12 +369,12 @@ public:
 
 class CCoderMT: public CCoder, public CVirtThread
 {
-  Z7_CLASS_NO_COPY(CCoderMT)
+  CLASS_NO_COPY(CCoderMT)
   CRecordVector<ISequentialInStream*> InStreamPointers;
   CRecordVector<ISequentialOutStream*> OutStreamPointers;
 
 private:
-  virtual void Execute() Z7_override;
+  void Execute();
 public:
   bool EncodeMode;
   HRESULT Result;
@@ -385,7 +394,7 @@ public:
 
   class CReleaser
   {
-    Z7_CLASS_NO_COPY(CReleaser)
+    CLASS_NO_COPY(CReleaser)
     CCoderMT &_c;
   public:
     CReleaser(CCoderMT &c): _c(c) {}
@@ -393,14 +402,7 @@ public:
   };
 
   CCoderMT(): EncodeMode(false) {}
-  ~CCoderMT() Z7_DESTRUCTOR_override
-  {
-    /* WaitThreadFinish() will be called in ~CVirtThread().
-       But we need WaitThreadFinish() call before CCoder destructor,
-       and before destructors of this class members.
-    */
-    CVirtThread::WaitThreadFinish();
-  }
+  ~CCoderMT() { CVirtThread::WaitThreadFinish(); }
   
   void Code(ICompressProgressInfo *progress);
 };
@@ -411,31 +413,29 @@ class CMixerMT:
   public CMixer,
   public CMyUnknownImp
 {
-  Z7_COM_UNKNOWN_IMP_0
-  Z7_CLASS_NO_COPY(CMixerMT)
-
   CObjectVector<CStreamBinder> _streamBinders;
 
   HRESULT Init(ISequentialInStream * const *inStreams, ISequentialOutStream * const *outStreams);
   HRESULT ReturnIfError(HRESULT code);
 
-  // virtual ~CMixerMT() {}
 public:
   CObjectVector<CCoderMT> _coders;
 
-  virtual HRESULT SetBindInfo(const CBindInfo &bindInfo) Z7_override;
-  virtual void AddCoder(const CCreatedCoder &cod) Z7_override;
-  virtual CCoder &GetCoder(unsigned index) Z7_override;
-  virtual void SelectMainCoder(bool useFirst) Z7_override;
-  virtual HRESULT ReInit2() Z7_override;
-  virtual void SetCoderInfo(unsigned coderIndex, const UInt64 *unpackSize, const UInt64 * const *packSizes, bool finish) Z7_override
+  MY_UNKNOWN_IMP
+
+  virtual HRESULT SetBindInfo(const CBindInfo &bindInfo);
+  virtual void AddCoder(const CCreatedCoder &cod);
+  virtual CCoder &GetCoder(unsigned index);
+  virtual void SelectMainCoder(bool useFirst);
+  virtual void ReInit();
+  virtual void SetCoderInfo(unsigned coderIndex, const UInt64 *unpackSize, const UInt64 * const *packSizes, bool finish)
     { _coders[coderIndex].SetCoderInfo(unpackSize, packSizes, finish); }
   virtual HRESULT Code(
       ISequentialInStream * const *inStreams,
       ISequentialOutStream * const *outStreams,
       ICompressProgressInfo *progress,
-      bool &dataAfterEnd_Error) Z7_override;
-  virtual UInt64 GetBondStreamSize(unsigned bondIndex) const Z7_override;
+      bool &dataAfterEnd_Error);
+  virtual UInt64 GetBondStreamSize(unsigned bondIndex) const;
 
   CMixerMT(bool encodeMode): CMixer(encodeMode) {}
 };

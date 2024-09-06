@@ -15,7 +15,7 @@ static AString GetIDString(const char *s, unsigned &finishPos)
   AString result;
   for (finishPos = 0; ; finishPos++)
   {
-    const char c = s[finishPos];
+    char c = s[finishPos];
     if (IsDelimitChar(c) || c == '=')
       break;
     result += c;
@@ -35,7 +35,7 @@ static bool SkipSpaces(const AString &s, unsigned &pos)
 {
   for (; pos < s.Len(); pos++)
   {
-    const char c = s[pos];
+    char c = s[pos];
     if (!IsDelimitChar(c))
     {
       if (c != ';')
@@ -90,14 +90,15 @@ bool GetTextConfig(const AString &s, CObjectVector<CTextConfigPair> &pairs)
         c = s[pos++];
         switch (c)
         {
-          case 'n':  c = '\n';  break;
-          case 't':  c = '\t';  break;
-          case '\\':  break;
-          case '\"':  break;
-          default:  message += '\\';  break;
+          case 'n': message += '\n'; break;
+          case 't': message += '\t'; break;
+          case '\\': message += '\\'; break;
+          case '\"': message += '\"'; break;
+          default: message += '\\'; message += c; break;
         }
       }
-      message += c;
+      else
+        message += c;
     }
     if (!ConvertUTF8ToUnicode(message, pair.String))
       return false;
@@ -110,13 +111,13 @@ int FindTextConfigItem(const CObjectVector<CTextConfigPair> &pairs, const char *
 {
   FOR_VECTOR (i, pairs)
     if (pairs[i].ID.IsEqualTo(id))
-      return (int)i;
+      return i;
   return -1;
 }
 
 UString GetTextConfigValue(const CObjectVector<CTextConfigPair> &pairs, const char *id)
 {
-  const int index = FindTextConfigItem(pairs, id);
+  int index = FindTextConfigItem(pairs, id);
   if (index < 0)
     return UString();
   return pairs[index].String;
