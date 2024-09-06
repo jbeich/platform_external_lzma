@@ -19,24 +19,24 @@ static bool MakeAutoName(const FString &name,
 
 bool AutoRenamePath(FString &path)
 {
-  const int dotPos = path.ReverseFind_Dot();
-  const int slashPos = path.ReverseFind_PathSepar();
+  int dotPos = path.ReverseFind_Dot();
+  int slashPos = path.ReverseFind_PathSepar();
 
   FString name = path;
   FString extension;
   if (dotPos > slashPos + 1)
   {
-    name.DeleteFrom((unsigned)dotPos);
-    extension = path.Ptr((unsigned)dotPos);
+    name.DeleteFrom(dotPos);
+    extension = path.Ptr(dotPos);
   }
-  name.Add_Char('_');
+  name += '_';
   
   FString temp;
 
-  UInt32 left = 1, right = (UInt32)1 << 30;
+  UInt32 left = 1, right = ((UInt32)1 << 30);
   while (left != right)
   {
-    const UInt32 mid = (left + right) / 2;
+    UInt32 mid = (left + right) / 2;
     if (MakeAutoName(name, extension, mid, temp))
       left = mid + 1;
     else

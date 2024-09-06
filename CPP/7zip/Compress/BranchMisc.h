@@ -1,57 +1,33 @@
 // BranchMisc.h
 
-#ifndef ZIP7_INC_COMPRESS_BRANCH_MISC_H
-#define ZIP7_INC_COMPRESS_BRANCH_MISC_H
-#include "../../../C/Bra.h"
+#ifndef __COMPRESS_BRANCH_MISC_H
+#define __COMPRESS_BRANCH_MISC_H
 
 #include "../../Common/MyCom.h"
 
 #include "../ICoder.h"
 
+EXTERN_C_BEGIN
+
+typedef SizeT (*Func_Bra)(Byte *data, SizeT size, UInt32 ip, int encoding);
+
+EXTERN_C_END
+
 namespace NCompress {
 namespace NBranch {
 
-Z7_CLASS_IMP_COM_1(
-  CCoder
-  , ICompressFilter
-)
-  UInt32 _pc;
-  z7_Func_BranchConv BraFunc;
+class CCoder:
+  public ICompressFilter,
+  public CMyUnknownImp
+{
+  UInt32 _bufferPos;
+  int _encode;
+  Func_Bra BraFunc;
 public:
-  CCoder(z7_Func_BranchConv bra): _pc(0), BraFunc(bra) {}
-};
+  MY_UNKNOWN_IMP1(ICompressFilter);
+  INTERFACE_ICompressFilter(;)
 
-#ifndef Z7_EXTRACT_ONLY
-
-Z7_CLASS_IMP_COM_3(
-  CEncoder
-  , ICompressFilter
-  , ICompressSetCoderProperties
-  , ICompressWriteCoderProperties
-)
-  UInt32 _pc;
-  UInt32 _pc_Init;
-  UInt32 _alignment;
-  z7_Func_BranchConv BraFunc;
-public:
-  CEncoder(z7_Func_BranchConv bra, UInt32 alignment):
-      _pc(0), _pc_Init(0), _alignment(alignment), BraFunc(bra) {}
-};
-
-#endif
-
-Z7_CLASS_IMP_COM_2(
-  CDecoder
-  , ICompressFilter
-  , ICompressSetDecoderProperties2
-)
-  UInt32 _pc;
-  UInt32 _pc_Init;
-  UInt32 _alignment;
-  z7_Func_BranchConv BraFunc;
-public:
-  CDecoder(z7_Func_BranchConv bra, UInt32 alignment):
-      _pc(0), _pc_Init(0), _alignment(alignment), BraFunc(bra) {}
+  CCoder(Func_Bra bra, int encode):  _bufferPos(0), _encode(encode), BraFunc(bra) {}
 };
 
 }}
