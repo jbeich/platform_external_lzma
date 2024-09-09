@@ -1,19 +1,19 @@
 /* LzmaDec.h -- LZMA Decoder
-2023-04-02 : Igor Pavlov : Public domain */
+2018-04-21 : Igor Pavlov : Public domain */
 
-#ifndef ZIP7_INC_LZMA_DEC_H
-#define ZIP7_INC_LZMA_DEC_H
+#ifndef __LZMA_DEC_H
+#define __LZMA_DEC_H
 
 #include "7zTypes.h"
 
 EXTERN_C_BEGIN
 
-/* #define Z7_LZMA_PROB32 */
-/* Z7_LZMA_PROB32 can increase the speed on some CPUs,
+/* #define _LZMA_PROB32 */
+/* _LZMA_PROB32 can increase the speed on some CPUs,
    but memory usage for CLzmaDec::probs will be doubled in that case */
 
 typedef
-#ifdef Z7_LZMA_PROB32
+#ifdef _LZMA_PROB32
   UInt32
 #else
   UInt16
@@ -25,7 +25,7 @@ typedef
 
 #define LZMA_PROPS_SIZE 5
 
-typedef struct
+typedef struct _CLzmaProps
 {
   Byte lc;
   Byte lp;
@@ -73,8 +73,7 @@ typedef struct
   Byte tempBuf[LZMA_REQUIRED_INPUT_MAX];
 } CLzmaDec;
 
-#define LzmaDec_CONSTRUCT(p) { (p)->dic = NULL; (p)->probs = NULL; }
-#define LzmaDec_Construct(p) LzmaDec_CONSTRUCT(p)
+#define LzmaDec_Construct(p) { (p)->dic = NULL; (p)->probs = NULL; }
 
 void LzmaDec_Init(CLzmaDec *p);
 
@@ -182,7 +181,6 @@ Returns:
       LZMA_STATUS_NEEDS_MORE_INPUT
       LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
   SZ_ERROR_DATA - Data error
-  SZ_ERROR_FAIL - Some unexpected error: internal error of code, memory corruption or hardware failure
 */
 
 SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
@@ -225,7 +223,6 @@ Returns:
   SZ_ERROR_MEM  - Memory allocation error
   SZ_ERROR_UNSUPPORTED - Unsupported properties
   SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
-  SZ_ERROR_FAIL - Some unexpected error: internal error of code, memory corruption or hardware failure
 */
 
 SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,

@@ -1,10 +1,12 @@
-CFLAGS = $(CFLAGS) -DZ7_PPMD_SUPPORT -DZ7_EXTRACT_ONLY
+CFLAGS = $(CFLAGS) -D_7ZIP_PPMD_SUPPPORT
 
 PROG = 7zDec.exe
 
 C_OBJS = \
   $O\7zAlloc.obj \
   $O\7zBuf.obj \
+  $O\7zCrc.obj \
+  $O\7zCrcOpt.obj \
   $O\7zFile.obj \
   $O\7zDec.obj \
   $O\7zArcIn.obj \
@@ -23,14 +25,10 @@ C_OBJS = \
 7Z_OBJS = \
   $O\7zMain.obj \
 
-!include "../../../CPP/7zip/Crc.mak"
-!include "../../../CPP/7zip/LzmaDec.mak"
-
 OBJS = \
   $O\Precomp.obj \
   $(7Z_OBJS) \
   $(C_OBJS) \
-  $(ASM_OBJS) \
 
 !include "../../../CPP/Build.mak"
 
@@ -40,5 +38,3 @@ $(C_OBJS): ../../$(*B).c
 	$(CCOMPL_USE)
 $O\Precomp.obj: Precomp.c
 	$(CCOMPL_PCH)
-
-!include "../../Asm_c.mak"

@@ -1,5 +1,5 @@
 /* LzmaDec.c -- LZMA Decoder
-2023-04-07 : Igor Pavlov : Public domain */
+2018-07-04 : Igor Pavlov : Public domain */
 
 #include "Precomp.h"
 
@@ -8,31 +8,29 @@
 /* #include "CpuArch.h" */
 #include "LzmaDec.h"
 
-// #define kNumTopBits 24
-#define kTopValue ((UInt32)1 << 24)
+#define kNumTopBits 24
+#define kTopValue ((UInt32)1 << kNumTopBits)
 
 #define kNumBitModelTotalBits 11
 #define kBitModelTotal (1 << kNumBitModelTotalBits)
+#define kNumMoveBits 5
 
 #define RC_INIT_SIZE 5
 
-#ifndef Z7_LZMA_DEC_OPT
-
-#define kNumMoveBits 5
 #define NORMALIZE if (range < kTopValue) { range <<= 8; code = (code << 8) | (*buf++); }
 
 #define IF_BIT_0(p) ttt = *(p); NORMALIZE; bound = (range >> kNumBitModelTotalBits) * (UInt32)ttt; if (code < bound)
 #define UPDATE_0(p) range = bound; *(p) = (CLzmaProb)(ttt + ((kBitModelTotal - ttt) >> kNumMoveBits));
 #define UPDATE_1(p) range -= bound; code -= bound; *(p) = (CLzmaProb)(ttt - (ttt >> kNumMoveBits));
 #define GET_BIT2(p, i, A0, A1) IF_BIT_0(p) \
-  { UPDATE_0(p)  i = (i + i); A0; } else \
-  { UPDATE_1(p)  i = (i + i) + 1; A1; }
+  { UPDATE_0(p); i = (i + i); A0; } else \
+  { UPDATE_1(p); i = (i + i) + 1; A1; }
 
 #define TREE_GET_BIT(probs, i) { GET_BIT2(probs + i, i, ;, ;); }
 
 #define REV_BIT(p, i, A0, A1) IF_BIT_0(p + i) \
-  { UPDATE_0(p + i)  A0; } else \
-  { UPDATE_1(p + i)  A1; }
+  { UPDATE_0(p + i); A0; } else \
+  { UPDATE_1(p + i); A1; }
 #define REV_BIT_VAR(  p, i, m) REV_BIT(p, i, i += m; m += m, m += m; i += m; )
 #define REV_BIT_CONST(p, i, m) REV_BIT(p, i, i += m;       , i += m * 2; )
 #define REV_BIT_LAST( p, i, m) REV_BIT(p, i, i -= m        , ; )
@@ -40,19 +38,19 @@
 #define TREE_DECODE(probs, limit, i) \
   { i = 1; do { TREE_GET_BIT(probs, i); } while (i < limit); i -= limit; }
 
-/* #define Z7_LZMA_SIZE_OPT */
+/* #define _LZMA_SIZE_OPT */
 
-#ifdef Z7_LZMA_SIZE_OPT
+#ifdef _LZMA_SIZE_OPT
 #define TREE_6_DECODE(probs, i) TREE_DECODE(probs, (1 << 6), i)
 #else
 #define TREE_6_DECODE(probs, i) \
   { i = 1; \
-  TREE_GET_BIT(probs, i) \
-  TREE_GET_BIT(probs, i) \
-  TREE_GET_BIT(probs, i) \
-  TREE_GET_BIT(probs, i) \
-  TREE_GET_BIT(probs, i) \
-  TREE_GET_BIT(probs, i) \
+  TREE_GET_BIT(probs, i); \
+  TREE_GET_BIT(probs, i); \
+  TREE_GET_BIT(probs, i); \
+  TREE_GET_BIT(probs, i); \
+  TREE_GET_BIT(probs, i); \
+  TREE_GET_BIT(probs, i); \
   i -= 0x40; }
 #endif
 
@@ -64,25 +62,24 @@
   probLit = prob + (offs + bit + symbol); \
   GET_BIT2(probLit, symbol, offs ^= bit; , ;)
 
-#endif // Z7_LZMA_DEC_OPT
 
 
-#define NORMALIZE_CHECK if (range < kTopValue) { if (buf >= bufLimit) return DUMMY_INPUT_EOF; range <<= 8; code = (code << 8) | (*buf++); }
+#define NORMALIZE_CHECK if (range < kTopValue) { if (buf >= bufLimit) return DUMMY_ERROR; range <<= 8; code = (code << 8) | (*buf++); }
 
-#define IF_BIT_0_CHECK(p) ttt = *(p); NORMALIZE_CHECK bound = (range >> kNumBitModelTotalBits) * (UInt32)ttt; if (code < bound)
+#define IF_BIT_0_CHECK(p) ttt = *(p); NORMALIZE_CHECK; bound = (range >> kNumBitModelTotalBits) * (UInt32)ttt; if (code < bound)
 #define UPDATE_0_CHECK range = bound;
 #define UPDATE_1_CHECK range -= bound; code -= bound;
 #define GET_BIT2_CHECK(p, i, A0, A1) IF_BIT_0_CHECK(p) \
-  { UPDATE_0_CHECK  i = (i + i); A0; } else \
-  { UPDATE_1_CHECK  i = (i + i) + 1; A1; }
+  { UPDATE_0_CHECK; i = (i + i); A0; } else \
+  { UPDATE_1_CHECK; i = (i + i) + 1; A1; }
 #define GET_BIT_CHECK(p, i) GET_BIT2_CHECK(p, i, ; , ;)
 #define TREE_DECODE_CHECK(probs, limit, i) \
   { i = 1; do { GET_BIT_CHECK(probs + i, i) } while (i < limit); i -= limit; }
 
 
 #define REV_BIT_CHECK(p, i, m) IF_BIT_0_CHECK(p + i) \
-  { UPDATE_0_CHECK  i += m; m += m; } else \
-  { UPDATE_1_CHECK  m += m; i += m; }
+  { UPDATE_0_CHECK; i += m; m += m; } else \
+  { UPDATE_1_CHECK; m += m; i += m; }
 
 
 #define kNumPosBitsMax 4
@@ -116,9 +113,6 @@
 
 #define kMatchMinLen 2
 #define kMatchSpecLenStart (kMatchMinLen + kLenNumLowSymbols * 2 + kLenNumHighSymbols)
-
-#define kMatchSpecLen_Error_Data (1 << 9)
-#define kMatchSpecLen_Error_Fail (kMatchSpecLen_Error_Data - 1)
 
 /* External ASM code needs same CLzmaProb array layout. So don't change it. */
 
@@ -172,12 +166,10 @@
 
 /*
 p->remainLen : shows status of LZMA decoder:
-    < kMatchSpecLenStart  : the number of bytes to be copied with (p->rep0) offset
-    = kMatchSpecLenStart  : the LZMA stream was finished with end mark
-    = kMatchSpecLenStart + 1  : need init range coder
-    = kMatchSpecLenStart + 2  : need init range coder and state
-    = kMatchSpecLen_Error_Fail                : Internal Code Failure
-    = kMatchSpecLen_Error_Data + [0 ... 273]  : LZMA Data Error
+    < kMatchSpecLenStart : normal remain
+    = kMatchSpecLenStart : finished
+    = kMatchSpecLenStart + 1 : need init range coder
+    = kMatchSpecLenStart + 2 : need init range coder and state
 */
 
 /* ---------- LZMA_DECODE_REAL ---------- */
@@ -196,42 +188,34 @@ In:
   {
     LzmaDec_TryDummy() was called before to exclude LITERAL and MATCH-REP cases.
     So first symbol can be only MATCH-NON-REP. And if that MATCH-NON-REP symbol
-    is not END_OF_PAYALOAD_MARKER, then the function doesn't write any byte to dictionary,
-    the function returns SZ_OK, and the caller can use (p->remainLen) and (p->reps[0]) later.
+    is not END_OF_PAYALOAD_MARKER, then function returns error code.
   }
 
 Processing:
-  The first LZMA symbol will be decoded in any case.
-  All main checks for limits are at the end of main loop,
-  It decodes additional LZMA-symbols while (p->buf < bufLimit && dicPos < limit),
+  first LZMA symbol will be decoded in any case
+  All checks for limits are at the end of main loop,
+  It will decode new LZMA-symbols while (p->buf < bufLimit && dicPos < limit),
   RangeCoder is still without last normalization when (p->buf < bufLimit) is being checked.
-  But if (p->buf < bufLimit), the caller provided at least (LZMA_REQUIRED_INPUT_MAX + 1) bytes for
-  next iteration  before limit (bufLimit + LZMA_REQUIRED_INPUT_MAX),
-  that is enough for worst case LZMA symbol with one additional RangeCoder normalization for one bit.
-  So that function never reads bufLimit [LZMA_REQUIRED_INPUT_MAX] byte.
 
 Out:
   RangeCoder is normalized
   Result:
     SZ_OK - OK
-      p->remainLen:
-        < kMatchSpecLenStart : the number of bytes to be copied with (p->reps[0]) offset
-        = kMatchSpecLenStart : the LZMA stream was finished with end mark
-
-    SZ_ERROR_DATA - error, when the MATCH-Symbol refers out of dictionary
-      p->remainLen : undefined
-      p->reps[*]    : undefined
+    SZ_ERROR_DATA - Error
+  p->remainLen:
+    < kMatchSpecLenStart : normal remain
+    = kMatchSpecLenStart : finished
 */
 
 
-#ifdef Z7_LZMA_DEC_OPT
+#ifdef _LZMA_DEC_OPT
 
-int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit);
+int MY_FAST_CALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit);
 
 #else
 
 static
-int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
+int MY_FAST_CALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
 {
   CLzmaProb *probs = GET_PROBS;
   unsigned state = (unsigned)p->state;
@@ -263,7 +247,7 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
     IF_BIT_0(prob)
     {
       unsigned symbol;
-      UPDATE_0(prob)
+      UPDATE_0(prob);
       prob = probs + Literal;
       if (processedPos != 0 || checkDicSize != 0)
         prob += (UInt32)3 * ((((processedPos << 8) + dic[(dicPos == 0 ? dicBufSize : dicPos) - 1]) & lpMask) << lc);
@@ -273,7 +257,7 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
       {
         state -= (state < 4) ? state : 3;
         symbol = 1;
-        #ifdef Z7_LZMA_SIZE_OPT
+        #ifdef _LZMA_SIZE_OPT
         do { NORMAL_LITER_DEC } while (symbol < 0x100);
         #else
         NORMAL_LITER_DEC
@@ -292,7 +276,7 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         unsigned offs = 0x100;
         state -= (state < 10) ? 3 : 6;
         symbol = 1;
-        #ifdef Z7_LZMA_SIZE_OPT
+        #ifdef _LZMA_SIZE_OPT
         do
         {
           unsigned bit;
@@ -321,62 +305,60 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
     }
     
     {
-      UPDATE_1(prob)
+      UPDATE_1(prob);
       prob = probs + IsRep + state;
       IF_BIT_0(prob)
       {
-        UPDATE_0(prob)
+        UPDATE_0(prob);
         state += kNumStates;
         prob = probs + LenCoder;
       }
       else
       {
-        UPDATE_1(prob)
+        UPDATE_1(prob);
+        /*
+        // that case was checked before with kBadRepCode
+        if (checkDicSize == 0 && processedPos == 0)
+          return SZ_ERROR_DATA;
+        */
         prob = probs + IsRepG0 + state;
         IF_BIT_0(prob)
         {
-          UPDATE_0(prob)
+          UPDATE_0(prob);
           prob = probs + IsRep0Long + COMBINED_PS_STATE;
           IF_BIT_0(prob)
           {
-            UPDATE_0(prob)
-  
-            // that case was checked before with kBadRepCode
-            // if (checkDicSize == 0 && processedPos == 0) { len = kMatchSpecLen_Error_Data + 1; break; }
-            // The caller doesn't allow (dicPos == limit) case here
-            // so we don't need the following check:
-            // if (dicPos == limit) { state = state < kNumLitStates ? 9 : 11; len = 1; break; }
-            
+            UPDATE_0(prob);
             dic[dicPos] = dic[dicPos - rep0 + (dicPos < rep0 ? dicBufSize : 0)];
             dicPos++;
             processedPos++;
             state = state < kNumLitStates ? 9 : 11;
             continue;
           }
-          UPDATE_1(prob)
+          UPDATE_1(prob);
         }
         else
         {
           UInt32 distance;
-          UPDATE_1(prob)
+          UPDATE_1(prob);
           prob = probs + IsRepG1 + state;
           IF_BIT_0(prob)
           {
-            UPDATE_0(prob)
+            UPDATE_0(prob);
             distance = rep1;
           }
           else
           {
-            UPDATE_1(prob)
+            UPDATE_1(prob);
             prob = probs + IsRepG2 + state;
             IF_BIT_0(prob)
             {
-              UPDATE_0(prob)
+              UPDATE_0(prob);
               distance = rep2;
             }
             else
             {
-              UPDATE_1(prob)
+              UPDATE_1(prob);
               distance = rep3;
               rep3 = rep2;
             }
@@ -389,37 +371,37 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         prob = probs + RepLenCoder;
       }
       
-      #ifdef Z7_LZMA_SIZE_OPT
+      #ifdef _LZMA_SIZE_OPT
       {
         unsigned lim, offset;
         CLzmaProb *probLen = prob + LenChoice;
         IF_BIT_0(probLen)
         {
-          UPDATE_0(probLen)
+          UPDATE_0(probLen);
           probLen = prob + LenLow + GET_LEN_STATE;
           offset = 0;
           lim = (1 << kLenNumLowBits);
         }
         else
         {
-          UPDATE_1(probLen)
+          UPDATE_1(probLen);
           probLen = prob + LenChoice2;
           IF_BIT_0(probLen)
           {
-            UPDATE_0(probLen)
+            UPDATE_0(probLen);
             probLen = prob + LenLow + GET_LEN_STATE + (1 << kLenNumLowBits);
             offset = kLenNumLowSymbols;
             lim = (1 << kLenNumLowBits);
           }
           else
           {
-            UPDATE_1(probLen)
+            UPDATE_1(probLen);
             probLen = prob + LenHigh;
             offset = kLenNumLowSymbols * 2;
             lim = (1 << kLenNumHighBits);
           }
         }
-        TREE_DECODE(probLen, lim, len)
+        TREE_DECODE(probLen, lim, len);
         len += offset;
       }
       #else
@@ -427,32 +409,32 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         CLzmaProb *probLen = prob + LenChoice;
         IF_BIT_0(probLen)
         {
-          UPDATE_0(probLen)
+          UPDATE_0(probLen);
           probLen = prob + LenLow + GET_LEN_STATE;
           len = 1;
-          TREE_GET_BIT(probLen, len)
-          TREE_GET_BIT(probLen, len)
-          TREE_GET_BIT(probLen, len)
+          TREE_GET_BIT(probLen, len);
+          TREE_GET_BIT(probLen, len);
+          TREE_GET_BIT(probLen, len);
           len -= 8;
         }
         else
         {
-          UPDATE_1(probLen)
+          UPDATE_1(probLen);
           probLen = prob + LenChoice2;
           IF_BIT_0(probLen)
           {
-            UPDATE_0(probLen)
+            UPDATE_0(probLen);
             probLen = prob + LenLow + GET_LEN_STATE + (1 << kLenNumLowBits);
             len = 1;
-            TREE_GET_BIT(probLen, len)
-            TREE_GET_BIT(probLen, len)
-            TREE_GET_BIT(probLen, len)
+            TREE_GET_BIT(probLen, len);
+            TREE_GET_BIT(probLen, len);
+            TREE_GET_BIT(probLen, len);
           }
           else
           {
-            UPDATE_1(probLen)
+            UPDATE_1(probLen);
             probLen = prob + LenHigh;
-            TREE_DECODE(probLen, (1 << kLenNumHighBits), len)
+            TREE_DECODE(probLen, (1 << kLenNumHighBits), len);
             len += kLenNumLowSymbols * 2;
           }
         }
@@ -464,7 +446,7 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         UInt32 distance;
         prob = probs + PosSlot +
             ((len < kNumLenToPosStates ? len : kNumLenToPosStates - 1) << kNumPosSlotBits);
-        TREE_6_DECODE(prob, distance)
+        TREE_6_DECODE(prob, distance);
         if (distance >= kStartPosModelIndex)
         {
           unsigned posSlot = (unsigned)distance;
@@ -479,7 +461,7 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
               distance++;
               do
               {
-                REV_BIT_VAR(prob, distance, m)
+                REV_BIT_VAR(prob, distance, m);
               }
               while (--numDirectBits);
               distance -= m;
@@ -514,10 +496,10 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
             distance <<= kNumAlignBits;
             {
               unsigned i = 1;
-              REV_BIT_CONST(prob, i, 1)
-              REV_BIT_CONST(prob, i, 2)
-              REV_BIT_CONST(prob, i, 4)
-              REV_BIT_LAST (prob, i, 8)
+              REV_BIT_CONST(prob, i, 1);
+              REV_BIT_CONST(prob, i, 2);
+              REV_BIT_CONST(prob, i, 4);
+              REV_BIT_LAST (prob, i, 8);
               distance |= i;
             }
             if (distance == (UInt32)0xFFFFFFFF)
@@ -536,10 +518,8 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         state = (state < kNumStates + kNumLitStates) ? kNumLitStates : kNumLitStates + 3;
         if (distance >= (checkDicSize == 0 ? processedPos: checkDicSize))
         {
-          len += kMatchSpecLen_Error_Data + kMatchMinLen;
-          // len = kMatchSpecLen_Error_Data;
-          // len += kMatchMinLen;
-          break;
+          p->dicPos = dicPos;
+          return SZ_ERROR_DATA;
         }
       }
 
@@ -552,13 +532,8 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
         
         if ((rem = limit - dicPos) == 0)
         {
-          /*
-          We stop decoding and return SZ_OK, and we can resume decoding later.
-          Any error conditions can be tested later in caller code.
-          For more strict mode we can stop decoding with error
-          // len += kMatchSpecLen_Error_Data;
-          */
-          break;
+          p->dicPos = dicPos;
+          return SZ_ERROR_DATA;
         }
         
         curLen = ((rem < len) ? (unsigned)rem : len);
@@ -592,12 +567,12 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
   }
   while (dicPos < limit && buf < bufLimit);
 
-  NORMALIZE
+  NORMALIZE;
   
   p->buf = buf;
   p->range = range;
   p->code = code;
-  p->remainLen = (UInt32)len; // & (kMatchSpecLen_Error_Data - 1); // we can write real length for error matches too.
+  p->remainLen = (UInt32)len;
   p->dicPos = dicPos;
   p->processedPos = processedPos;
   p->reps[0] = rep0;
@@ -605,60 +580,39 @@ int Z7_FASTCALL LZMA_DECODE_REAL(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
   p->reps[2] = rep2;
   p->reps[3] = rep3;
   p->state = (UInt32)state;
-  if (len >= kMatchSpecLen_Error_Data)
-    return SZ_ERROR_DATA;
+
   return SZ_OK;
 }
 #endif
 
-
-
-static void Z7_FASTCALL LzmaDec_WriteRem(CLzmaDec *p, SizeT limit)
+static void MY_FAST_CALL LzmaDec_WriteRem(CLzmaDec *p, SizeT limit)
 {
-  unsigned len = (unsigned)p->remainLen;
-  if (len == 0 /* || len >= kMatchSpecLenStart */)
-    return;
+  if (p->remainLen != 0 && p->remainLen < kMatchSpecLenStart)
   {
+    Byte *dic = p->dic;
     SizeT dicPos = p->dicPos;
-    Byte *dic;
-    SizeT dicBufSize;
-    SizeT rep0;   /* we use SizeT to avoid the BUG of VC14 for AMD64 */
-    {
-      SizeT rem = limit - dicPos;
-      if (rem < len)
-      {
-        len = (unsigned)(rem);
-        if (len == 0)
-          return;
-      }
-    }
+    SizeT dicBufSize = p->dicBufSize;
+    unsigned len = (unsigned)p->remainLen;
+    SizeT rep0 = p->reps[0]; /* we use SizeT to avoid the BUG of VC14 for AMD64 */
+    SizeT rem = limit - dicPos;
+    if (rem < len)
+      len = (unsigned)(rem);
 
     if (p->checkDicSize == 0 && p->prop.dicSize - p->processedPos <= len)
       p->checkDicSize = p->prop.dicSize;
 
     p->processedPos += (UInt32)len;
     p->remainLen -= (UInt32)len;
-    dic = p->dic;
-    rep0 = p->reps[0];
-    dicBufSize = p->dicBufSize;
-    do
+    while (len != 0)
     {
+      len--;
       dic[dicPos] = dic[dicPos - rep0 + (dicPos < rep0 ? dicBufSize : 0)];
       dicPos++;
     }
-    while (--len);
     p->dicPos = dicPos;
   }
 }
 
-
-/*
-At staring of new stream we have one of the following symbols:
-  - Literal        - is allowed
-  - Non-Rep-Match  - is allowed only if it's end marker symbol
-  - Rep-Match      - is not allowed
-We use early check of (RangeCoder:Code) over kBadRepCode to simplify main decoding code
-*/
 
 #define kRange0 0xFFFFFFFF
 #define kBound0 ((kRange0 >> kNumBitModelTotalBits) << (kNumBitModelTotalBits - 1))
@@ -667,77 +621,69 @@ We use early check of (RangeCoder:Code) over kBadRepCode to simplify main decodi
   #error Stop_Compiling_Bad_LZMA_Check
 #endif
 
-
-/*
-LzmaDec_DecodeReal2():
-  It calls LZMA_DECODE_REAL() and it adjusts limit according (p->checkDicSize).
-
-We correct (p->checkDicSize) after LZMA_DECODE_REAL() and in LzmaDec_WriteRem(),
-and we support the following state of (p->checkDicSize):
-  if (total_processed < p->prop.dicSize) then
-  {
-    (total_processed == p->processedPos)
-    (p->checkDicSize == 0)
-  }
-  else
-    (p->checkDicSize == p->prop.dicSize)
-*/
-
-static int Z7_FASTCALL LzmaDec_DecodeReal2(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
+static int MY_FAST_CALL LzmaDec_DecodeReal2(CLzmaDec *p, SizeT limit, const Byte *bufLimit)
 {
-  if (p->checkDicSize == 0)
+  do
   {
-    UInt32 rem = p->prop.dicSize - p->processedPos;
-    if (limit - p->dicPos > rem)
-      limit = p->dicPos + rem;
-  }
-  {
-    int res = LZMA_DECODE_REAL(p, limit, bufLimit);
+    SizeT limit2 = limit;
+    if (p->checkDicSize == 0)
+    {
+      UInt32 rem = p->prop.dicSize - p->processedPos;
+      if (limit - p->dicPos > rem)
+        limit2 = p->dicPos + rem;
+
+      if (p->processedPos == 0)
+        if (p->code >= kBadRepCode)
+          return SZ_ERROR_DATA;
+    }
+
+    RINOK(LZMA_DECODE_REAL(p, limit2, bufLimit));
+    
     if (p->checkDicSize == 0 && p->processedPos >= p->prop.dicSize)
       p->checkDicSize = p->prop.dicSize;
-    return res;
+    
+    LzmaDec_WriteRem(p, limit);
   }
+  while (p->dicPos < limit && p->buf < bufLimit && p->remainLen < kMatchSpecLenStart);
+
+  return 0;
 }
-
-
 
 typedef enum
 {
-  DUMMY_INPUT_EOF, /* need more input data */
+  DUMMY_ERROR, /* unexpected end of input stream */
   DUMMY_LIT,
   DUMMY_MATCH,
   DUMMY_REP
 } ELzmaDummy;
 
-
-#define IS_DUMMY_END_MARKER_POSSIBLE(dummyRes) ((dummyRes) == DUMMY_MATCH)
-
-static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, const Byte **bufOut)
+static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, SizeT inSize)
 {
   UInt32 range = p->range;
   UInt32 code = p->code;
-  const Byte *bufLimit = *bufOut;
+  const Byte *bufLimit = buf + inSize;
   const CLzmaProb *probs = GET_PROBS;
   unsigned state = (unsigned)p->state;
   ELzmaDummy res;
 
-  for (;;)
   {
     const CLzmaProb *prob;
     UInt32 bound;
     unsigned ttt;
-    unsigned posState = CALC_POS_STATE(p->processedPos, ((unsigned)1 << p->prop.pb) - 1);
+    unsigned posState = CALC_POS_STATE(p->processedPos, (1 << p->prop.pb) - 1);
 
     prob = probs + IsMatch + COMBINED_PS_STATE;
     IF_BIT_0_CHECK(prob)
     {
       UPDATE_0_CHECK
 
+      /* if (bufLimit - buf >= 7) return DUMMY_LIT; */
+
       prob = probs + Literal;
       if (p->checkDicSize != 0 || p->processedPos != 0)
         prob += ((UInt32)LZMA_LIT_SIZE *
-            ((((p->processedPos) & (((unsigned)1 << (p->prop.lp)) - 1)) << p->prop.lc) +
-            ((unsigned)p->dic[(p->dicPos == 0 ? p->dicBufSize : p->dicPos) - 1] >> (8 - p->prop.lc))));
+            ((((p->processedPos) & ((1 << (p->prop.lp)) - 1)) << p->prop.lc) +
+            (p->dic[(p->dicPos == 0 ? p->dicBufSize : p->dicPos) - 1] >> (8 - p->prop.lc))));
 
       if (state < kNumLitStates)
       {
@@ -767,54 +713,55 @@ static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, const Byt
     else
     {
       unsigned len;
-      UPDATE_1_CHECK
+      UPDATE_1_CHECK;
 
       prob = probs + IsRep + state;
       IF_BIT_0_CHECK(prob)
       {
-        UPDATE_0_CHECK
+        UPDATE_0_CHECK;
         state = 0;
         prob = probs + LenCoder;
         res = DUMMY_MATCH;
       }
       else
       {
-        UPDATE_1_CHECK
+        UPDATE_1_CHECK;
         res = DUMMY_REP;
         prob = probs + IsRepG0 + state;
         IF_BIT_0_CHECK(prob)
         {
-          UPDATE_0_CHECK
+          UPDATE_0_CHECK;
           prob = probs + IsRep0Long + COMBINED_PS_STATE;
           IF_BIT_0_CHECK(prob)
           {
-            UPDATE_0_CHECK
-            break;
+            UPDATE_0_CHECK;
+            NORMALIZE_CHECK;
+            return DUMMY_REP;
           }
           else
           {
-            UPDATE_1_CHECK
+            UPDATE_1_CHECK;
           }
         }
         else
         {
-          UPDATE_1_CHECK
+          UPDATE_1_CHECK;
           prob = probs + IsRepG1 + state;
           IF_BIT_0_CHECK(prob)
           {
-            UPDATE_0_CHECK
+            UPDATE_0_CHECK;
           }
           else
           {
-            UPDATE_1_CHECK
+            UPDATE_1_CHECK;
             prob = probs + IsRepG2 + state;
             IF_BIT_0_CHECK(prob)
             {
-              UPDATE_0_CHECK
+              UPDATE_0_CHECK;
             }
             else
             {
-              UPDATE_1_CHECK
+              UPDATE_1_CHECK;
             }
           }
         }
@@ -826,31 +773,31 @@ static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, const Byt
         const CLzmaProb *probLen = prob + LenChoice;
         IF_BIT_0_CHECK(probLen)
         {
-          UPDATE_0_CHECK
+          UPDATE_0_CHECK;
           probLen = prob + LenLow + GET_LEN_STATE;
           offset = 0;
           limit = 1 << kLenNumLowBits;
         }
         else
         {
-          UPDATE_1_CHECK
+          UPDATE_1_CHECK;
           probLen = prob + LenChoice2;
           IF_BIT_0_CHECK(probLen)
           {
-            UPDATE_0_CHECK
+            UPDATE_0_CHECK;
             probLen = prob + LenLow + GET_LEN_STATE + (1 << kLenNumLowBits);
             offset = kLenNumLowSymbols;
             limit = 1 << kLenNumLowBits;
           }
           else
           {
-            UPDATE_1_CHECK
+            UPDATE_1_CHECK;
             probLen = prob + LenHigh;
             offset = kLenNumLowSymbols * 2;
             limit = 1 << kLenNumHighBits;
           }
         }
-        TREE_DECODE_CHECK(probLen, limit, len)
+        TREE_DECODE_CHECK(probLen, limit, len);
         len += offset;
       }
 
@@ -860,10 +807,12 @@ static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, const Byt
         prob = probs + PosSlot +
             ((len < kNumLenToPosStates - 1 ? len : kNumLenToPosStates - 1) <<
             kNumPosSlotBits);
-        TREE_DECODE_CHECK(prob, 1 << kNumPosSlotBits, posSlot)
+        TREE_DECODE_CHECK(prob, 1 << kNumPosSlotBits, posSlot);
         if (posSlot >= kStartPosModelIndex)
         {
           unsigned numDirectBits = ((posSlot >> 1) - 1);
+
+          /* if (bufLimit - buf >= 8) return DUMMY_MATCH; */
 
           if (posSlot < kEndPosModelIndex)
           {
@@ -888,22 +837,19 @@ static ELzmaDummy LzmaDec_TryDummy(const CLzmaDec *p, const Byte *buf, const Byt
             unsigned m = 1;
             do
             {
-              REV_BIT_CHECK(prob, i, m)
+              REV_BIT_CHECK(prob, i, m);
             }
             while (--numDirectBits);
           }
         }
       }
     }
-    break;
   }
-  NORMALIZE_CHECK
-
-  *bufOut = buf;
+  NORMALIZE_CHECK;
   return res;
 }
 
-void LzmaDec_InitDicAndState(CLzmaDec *p, BoolInt initDic, BoolInt initState);
+
 void LzmaDec_InitDicAndState(CLzmaDec *p, BoolInt initDic, BoolInt initState)
 {
   p->remainLen = kMatchSpecLenStart + 1;
@@ -926,41 +872,16 @@ void LzmaDec_Init(CLzmaDec *p)
 }
 
 
-/*
-LZMA supports optional end_marker.
-So the decoder can lookahead for one additional LZMA-Symbol to check end_marker.
-That additional LZMA-Symbol can require up to LZMA_REQUIRED_INPUT_MAX bytes in input stream.
-When the decoder reaches dicLimit, it looks (finishMode) parameter:
-  if (finishMode == LZMA_FINISH_ANY), the decoder doesn't lookahead
-  if (finishMode != LZMA_FINISH_ANY), the decoder lookahead, if end_marker is possible for current position
-
-When the decoder lookahead, and the lookahead symbol is not end_marker, we have two ways:
-  1) Strict mode (default) : the decoder returns SZ_ERROR_DATA.
-  2) The relaxed mode (alternative mode) : we could return SZ_OK, and the caller
-     must check (status) value. The caller can show the error,
-     if the end of stream is expected, and the (status) is noit
-     LZMA_STATUS_FINISHED_WITH_MARK or LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK.
-*/
-
-
-#define RETURN_NOT_FINISHED_FOR_FINISH \
-  *status = LZMA_STATUS_NOT_FINISHED; \
-  return SZ_ERROR_DATA; // for strict mode
-  // return SZ_OK; // for relaxed mode
-
-
 SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit, const Byte *src, SizeT *srcLen,
     ELzmaFinishMode finishMode, ELzmaStatus *status)
 {
   SizeT inSize = *srcLen;
   (*srcLen) = 0;
+  
   *status = LZMA_STATUS_NOT_SPECIFIED;
 
   if (p->remainLen > kMatchSpecLenStart)
   {
-    if (p->remainLen > kMatchSpecLenStart + 2)
-      return p->remainLen == kMatchSpecLen_Error_Fail ? SZ_ERROR_FAIL : SZ_ERROR_DATA;
-
     for (; inSize > 0 && p->tempBufSize < RC_INIT_SIZE; (*srcLen)++, inSize--)
       p->tempBuf[p->tempBufSize++] = *src++;
     if (p->tempBufSize != 0 && p->tempBuf[0] != 0)
@@ -975,12 +896,6 @@ SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit, const Byte *src, SizeT *sr
       | ((UInt32)p->tempBuf[2] << 16)
       | ((UInt32)p->tempBuf[3] << 8)
       | ((UInt32)p->tempBuf[4]);
-
-    if (p->checkDicSize == 0
-        && p->processedPos == 0
-        && p->code >= kBadRepCode)
-      return SZ_ERROR_DATA;
-
     p->range = 0xFFFFFFFF;
     p->tempBufSize = 0;
 
@@ -998,21 +913,10 @@ SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit, const Byte *src, SizeT *sr
     p->remainLen = 0;
   }
 
-  for (;;)
+  LzmaDec_WriteRem(p, dicLimit);
+
+  while (p->remainLen != kMatchSpecLenStart)
   {
-    if (p->remainLen == kMatchSpecLenStart)
-    {
-      if (p->code != 0)
-        return SZ_ERROR_DATA;
-      *status = LZMA_STATUS_FINISHED_WITH_MARK;
-      return SZ_OK;
-    }
-
-    LzmaDec_WriteRem(p, dicLimit);
-
-    {
-      // (p->remainLen == 0 || p->dicPos == dicLimit)
-
       int checkEndMarkNow = 0;
 
       if (p->dicPos >= dicLimit)
@@ -1029,172 +933,90 @@ SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit, const Byte *src, SizeT *sr
         }
         if (p->remainLen != 0)
         {
-          RETURN_NOT_FINISHED_FOR_FINISH
+          *status = LZMA_STATUS_NOT_FINISHED;
+          return SZ_ERROR_DATA;
         }
         checkEndMarkNow = 1;
       }
 
-      // (p->remainLen == 0)
-
       if (p->tempBufSize == 0)
       {
+        SizeT processed;
         const Byte *bufLimit;
-        int dummyProcessed = -1;
-        
         if (inSize < LZMA_REQUIRED_INPUT_MAX || checkEndMarkNow)
         {
-          const Byte *bufOut = src + inSize;
-          
-          ELzmaDummy dummyRes = LzmaDec_TryDummy(p, src, &bufOut);
-          
-          if (dummyRes == DUMMY_INPUT_EOF)
+          int dummyRes = LzmaDec_TryDummy(p, src, inSize);
+          if (dummyRes == DUMMY_ERROR)
           {
-            size_t i;
-            if (inSize >= LZMA_REQUIRED_INPUT_MAX)
-              break;
-            (*srcLen) += inSize;
+            memcpy(p->tempBuf, src, inSize);
             p->tempBufSize = (unsigned)inSize;
-            for (i = 0; i < inSize; i++)
-              p->tempBuf[i] = src[i];
+            (*srcLen) += inSize;
             *status = LZMA_STATUS_NEEDS_MORE_INPUT;
             return SZ_OK;
           }
- 
-          dummyProcessed = (int)(bufOut - src);
-          if ((unsigned)dummyProcessed > LZMA_REQUIRED_INPUT_MAX)
-            break;
-          
-          if (checkEndMarkNow && !IS_DUMMY_END_MARKER_POSSIBLE(dummyRes))
+          if (checkEndMarkNow && dummyRes != DUMMY_MATCH)
           {
-            unsigned i;
-            (*srcLen) += (unsigned)dummyProcessed;
-            p->tempBufSize = (unsigned)dummyProcessed;
-            for (i = 0; i < (unsigned)dummyProcessed; i++)
-              p->tempBuf[i] = src[i];
-            // p->remainLen = kMatchSpecLen_Error_Data;
-            RETURN_NOT_FINISHED_FOR_FINISH
+            *status = LZMA_STATUS_NOT_FINISHED;
+            return SZ_ERROR_DATA;
           }
-          
           bufLimit = src;
-          // we will decode only one iteration
         }
         else
           bufLimit = src + inSize - LZMA_REQUIRED_INPUT_MAX;
-
         p->buf = src;
-        
-        {
-          int res = LzmaDec_DecodeReal2(p, dicLimit, bufLimit);
-          
-          SizeT processed = (SizeT)(p->buf - src);
-
-          if (dummyProcessed < 0)
-          {
-            if (processed > inSize)
-              break;
-          }
-          else if ((unsigned)dummyProcessed != processed)
-            break;
-
-          src += processed;
-          inSize -= processed;
-          (*srcLen) += processed;
-
-          if (res != SZ_OK)
-          {
-            p->remainLen = kMatchSpecLen_Error_Data;
-            return SZ_ERROR_DATA;
-          }
-        }
-        continue;
+        if (LzmaDec_DecodeReal2(p, dicLimit, bufLimit) != 0)
+          return SZ_ERROR_DATA;
+        processed = (SizeT)(p->buf - src);
+        (*srcLen) += processed;
+        src += processed;
+        inSize -= processed;
       }
-
+      else
       {
-        // we have some data in (p->tempBuf)
-        // in strict mode: tempBufSize is not enough for one Symbol decoding.
-        // in relaxed mode: tempBufSize not larger than required for one Symbol decoding.
-
-        unsigned rem = p->tempBufSize;
-        unsigned ahead = 0;
-        int dummyProcessed = -1;
-        
-        while (rem < LZMA_REQUIRED_INPUT_MAX && ahead < inSize)
-          p->tempBuf[rem++] = src[ahead++];
-        
-        // ahead - the size of new data copied from (src) to (p->tempBuf)
-        // rem   - the size of temp buffer including new data from (src)
-        
+        unsigned rem = p->tempBufSize, lookAhead = 0;
+        while (rem < LZMA_REQUIRED_INPUT_MAX && lookAhead < inSize)
+          p->tempBuf[rem++] = src[lookAhead++];
+        p->tempBufSize = rem;
         if (rem < LZMA_REQUIRED_INPUT_MAX || checkEndMarkNow)
         {
-          const Byte *bufOut = p->tempBuf + rem;
-        
-          ELzmaDummy dummyRes = LzmaDec_TryDummy(p, p->tempBuf, &bufOut);
-          
-          if (dummyRes == DUMMY_INPUT_EOF)
+          int dummyRes = LzmaDec_TryDummy(p, p->tempBuf, (SizeT)rem);
+          if (dummyRes == DUMMY_ERROR)
           {
-            if (rem >= LZMA_REQUIRED_INPUT_MAX)
-              break;
-            p->tempBufSize = rem;
-            (*srcLen) += (SizeT)ahead;
+            (*srcLen) += (SizeT)lookAhead;
             *status = LZMA_STATUS_NEEDS_MORE_INPUT;
             return SZ_OK;
           }
-          
-          dummyProcessed = (int)(bufOut - p->tempBuf);
-
-          if ((unsigned)dummyProcessed < p->tempBufSize)
-            break;
-
-          if (checkEndMarkNow && !IS_DUMMY_END_MARKER_POSSIBLE(dummyRes))
+          if (checkEndMarkNow && dummyRes != DUMMY_MATCH)
           {
-            (*srcLen) += (unsigned)dummyProcessed - p->tempBufSize;
-            p->tempBufSize = (unsigned)dummyProcessed;
-            // p->remainLen = kMatchSpecLen_Error_Data;
-            RETURN_NOT_FINISHED_FOR_FINISH
-          }
-        }
-
-        p->buf = p->tempBuf;
-        
-        {
-          // we decode one symbol from (p->tempBuf) here, so the (bufLimit) is equal to (p->buf)
-          int res = LzmaDec_DecodeReal2(p, dicLimit, p->buf);
-
-          SizeT processed = (SizeT)(p->buf - p->tempBuf);
-          rem = p->tempBufSize;
-          
-          if (dummyProcessed < 0)
-          {
-            if (processed > LZMA_REQUIRED_INPUT_MAX)
-              break;
-            if (processed < rem)
-              break;
-          }
-          else if ((unsigned)dummyProcessed != processed)
-            break;
-          
-          processed -= rem;
-
-          src += processed;
-          inSize -= processed;
-          (*srcLen) += processed;
-          p->tempBufSize = 0;
-          
-          if (res != SZ_OK)
-          {
-            p->remainLen = kMatchSpecLen_Error_Data;
+            *status = LZMA_STATUS_NOT_FINISHED;
             return SZ_ERROR_DATA;
           }
         }
+        p->buf = p->tempBuf;
+        if (LzmaDec_DecodeReal2(p, dicLimit, p->buf) != 0)
+          return SZ_ERROR_DATA;
+        
+        {
+          unsigned kkk = (unsigned)(p->buf - p->tempBuf);
+          if (rem < kkk)
+            return SZ_ERROR_FAIL; /* some internal error */
+          rem -= kkk;
+          if (lookAhead < rem)
+            return SZ_ERROR_FAIL; /* some internal error */
+          lookAhead -= rem;
+        }
+        (*srcLen) += (SizeT)lookAhead;
+        src += lookAhead;
+        inSize -= (SizeT)lookAhead;
+        p->tempBufSize = 0;
       }
-    }
   }
-
-  /*  Some unexpected error: internal error of code, memory corruption or hardware failure */
-  p->remainLen = kMatchSpecLen_Error_Fail;
-  return SZ_ERROR_FAIL;
+  
+  if (p->code != 0)
+    return SZ_ERROR_DATA;
+  *status = LZMA_STATUS_FINISHED_WITH_MARK;
+  return SZ_OK;
 }
-
 
 
 SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status)
@@ -1299,8 +1121,8 @@ static SRes LzmaDec_AllocateProbs2(CLzmaDec *p, const CLzmaProps *propNew, ISzAl
 SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc)
 {
   CLzmaProps propNew;
-  RINOK(LzmaProps_Decode(&propNew, props, propsSize))
-  RINOK(LzmaDec_AllocateProbs2(p, &propNew, alloc))
+  RINOK(LzmaProps_Decode(&propNew, props, propsSize));
+  RINOK(LzmaDec_AllocateProbs2(p, &propNew, alloc));
   p->prop = propNew;
   return SZ_OK;
 }
@@ -1309,14 +1131,14 @@ SRes LzmaDec_Allocate(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAll
 {
   CLzmaProps propNew;
   SizeT dicBufSize;
-  RINOK(LzmaProps_Decode(&propNew, props, propsSize))
-  RINOK(LzmaDec_AllocateProbs2(p, &propNew, alloc))
+  RINOK(LzmaProps_Decode(&propNew, props, propsSize));
+  RINOK(LzmaDec_AllocateProbs2(p, &propNew, alloc));
 
   {
     UInt32 dictSize = propNew.dicSize;
     SizeT mask = ((UInt32)1 << 12) - 1;
          if (dictSize >= ((UInt32)1 << 30)) mask = ((UInt32)1 << 22) - 1;
-    else if (dictSize >= ((UInt32)1 << 22)) mask = ((UInt32)1 << 20) - 1;
+    else if (dictSize >= ((UInt32)1 << 22)) mask = ((UInt32)1 << 20) - 1;;
     dicBufSize = ((SizeT)dictSize + mask) & ~mask;
     if (dicBufSize < dictSize)
       dicBufSize = dictSize;
@@ -1348,8 +1170,8 @@ SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
   *status = LZMA_STATUS_NOT_SPECIFIED;
   if (inSize < RC_INIT_SIZE)
     return SZ_ERROR_INPUT_EOF;
-  LzmaDec_CONSTRUCT(&p)
-  RINOK(LzmaDec_AllocateProbs(&p, propData, propSize, alloc))
+  LzmaDec_Construct(&p);
+  RINOK(LzmaDec_AllocateProbs(&p, propData, propSize, alloc));
   p.dic = dest;
   p.dicBufSize = outSize;
   LzmaDec_Init(&p);
