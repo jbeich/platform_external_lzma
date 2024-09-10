@@ -81,15 +81,6 @@ cc_library {
         "C/XzIn.c",
     ],
 
-    arch: {
-        arm: {
-            cflags: ["-march=armv8-a+crypto"],
-        },
-        arm64: {
-            cflags: ["-march=armv8-a+crypto"],
-        },
-    },
-
     target: {
         linux_bionic: {
             enabled: true,
