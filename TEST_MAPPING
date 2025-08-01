@@ -1,0 +1,16 @@
+{
+  "presubmit": [
+    {
+      "name": "art-run-test-001-HelloWorld"
+    },
+    {
+      "name": "art-run-test-001-Main"
+    },
+    {
+      "name": "art_standalone_dex2oat_tests"
+    },
+    {
+      "name": "art_standalone_dexpreopt_tests"
+    }
+  ]
+}
