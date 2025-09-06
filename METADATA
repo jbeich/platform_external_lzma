@@ -7,14 +7,14 @@ description: "LZMA is default and general compression method of 7z format."
 third_party {
   license_type: UNENCUMBERED
   last_upgrade_date {
-    year: 2024
-    month: 12
-    day: 3
+    year: 2025
+    month: 9
+    day: 4
   }
   homepage: "https://7-zip.org/"
   identifier {
     type: "Archive"
-    value: "https://github.com/ip7z/7zip/archive/24.09.tar.gz"
-    version: "24.09"
+    value: "https://github.com/ip7z/7zip/archive/25.01.tar.gz"
+    version: "25.01"
   }
 }
